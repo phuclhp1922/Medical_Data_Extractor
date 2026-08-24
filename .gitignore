@@ -1,0 +1,68 @@
+# ---------------------------------------------------------------------------
+# DATA GOVERNANCE - DO NOT RELAX THESE RULES
+#
+# The source corpus derives from "Clinical Cases in Tropical Medicine"
+# (Elsevier, 2022), which is copyrighted. Neither the extracted text, the
+# extracted figures, nor any generated teaching case derived from them may be
+# committed to a public repository.
+#
+# Commit: code, aggregate metrics, plots, paraphrased illustrative examples.
+# See PLAN.md section 5 and DATASHEET.md for the provenance rationale.
+#
+# NOTE: .gitignore cannot protect you from outputs saved INSIDE a notebook.
+# Use nbstripout (see PLAN.md) - the original prototype carried ~199KB of
+# generated clinical text in its saved cell outputs.
+# ---------------------------------------------------------------------------
+data/
+extracted_data/
+outputs/
+benchmark_image/
+runs/
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.zip
+
+# Human labels quote verbatim source text
+eval_labels/
+*.labels.jsonl
+
+# Exception: committed report artifacts are aggregate-only and safe to publish
+!reports/**/*.png
+!reports/**/*.svg
+
+# ---------------------------------------------------------------------------
+# Secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.key
+secrets.json
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Notebooks / editors / OS
+# ---------------------------------------------------------------------------
+.ipynb_checkpoints/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

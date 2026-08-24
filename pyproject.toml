@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medical-vlm-curator"
+version = "0.1.0"
+description = "Curates medical visual-reasoning data from case reports with a calibrated LLM judge."
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "langgraph>=0.2",
+    "google-genai>=1.0",
+    "pydantic>=2.7",
+    "typer>=0.12",
+    "pandas>=2.2",
+    "tqdm>=4.66",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# Calibration / agreement statistics. Separate so the pipeline runs without
+# pulling scikit-learn and matplotlib.
+eval = [
+    "scikit-learn>=1.5",
+    "scipy>=1.13",
+    "matplotlib>=3.9",
+]
+dev = [
+    "pytest>=8.2",
+    "ruff>=0.5",
+    "nbstripout>=0.7",
+]
+
+# NOTE: the PDF -> markdown extraction stage is deliberately NOT declared here.
+# The golden corpus was produced with mineru==2.5.4 (recorded in each case's
+# _middle.json as _version_name). That stage is reproducibility documentation,
+# not capability - it is deferred until after calibration. See PLAN.md.
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Tests needing the real corpus are marked `corpus`; tests that spend API
+# tokens are marked `live`. Neither runs by default.
+addopts = "-m 'not live'"
+markers = [
+    "live: hits a real LLM API and costs money",
+    "corpus: requires the local MinerU corpus (not redistributable)",
+]

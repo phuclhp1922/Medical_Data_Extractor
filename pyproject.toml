@@ -8,6 +8,11 @@ version = "0.1.0"
 description = "Curates medical visual-reasoning data from case reports with a calibrated LLM judge."
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+# NOTE: the MIT license covers the CODE only. The curated dataset derives from
+# copyrighted source material and is NOT redistributable. See README.md and
+# DATASHEET.md - do not restate the dataset terms inside LICENSE itself.
 
 dependencies = [
     "langgraph>=0.2",
@@ -44,6 +49,10 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Archived prototype notebooks are a historical record, kept verbatim as evidence
+# for the findings in PLAN.md. Linting them is noise (151 findings, none in src/),
+# and reformatting them would destroy their value as a record.
+extend-exclude = ["notebooks/archive"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

@@ -45,11 +45,19 @@ The image hashes are **identical between the two** (spot-checked cases 5, 28, 33
 present), so this is the same MinerU run, post-processed: directories renamed, auxiliary
 files deleted, and **the markdown rewritten so figure labels precede their images**.
 
-**The script that did that is not in any of the three notebooks and is not on disk.** Your
-pipeline's actual input therefore cannot currently be regenerated from your raw corpus. This
-is the single biggest reproducibility hole in the project, it was invisible until now, and
-Phase 0 must close it. The good news: `figures.py` (§3) *is* that missing stage, done
-properly and from `_content_list.json` rather than from edited markdown.
+**The script that did that is not in any of the three notebooks and is not on disk.** So the
+exact bytes the prototype consumed cannot be regenerated.
+
+**But this is a cleanup pass, not a lost stage — a correction to an earlier draft of this
+plan.** `extracted_data/` is the *original* MinerU output and is strictly richer than the
+zip: identical images, plus every auxiliary file the zip deleted. The zip's only unique
+content was figure labels embedded in rewritten markdown, and `figures.py` (§3) recovers
+those from `_content_list.json` — better, because it does so with two independent methods
+that can be cross-checked. Nothing of substance is lost.
+
+What the zip is still good for is **provenance**: it is the literal input that produced the
+51 published cases, so it belongs in `DATASHEET.md` if you can retrieve it. Download it when
+convenient. It does not block anything, and it is not worth reordering work for.
 
 **What blocks it from being a portfolio piece:**
 
@@ -281,8 +289,26 @@ body text refers to `Fig. 22.1`. Naive "first regex match wins" mislabels it. Th
 guard rejects it and positional inference gets it right. *This is the entire argument for
 using two methods, and it's a good thing to be able to narrate in an interview.*
 
-One residual disagreement (case 24, positional says figure 1, caption says `24.12`) needs
-manual inspection — likely a figure reproduced from elsewhere in the book.
+**Why the second guard matters — the other real example.** Case 24 was the one residual
+disagreement (positional said `24.1`, caption said `24.12`). Inspection shows it is *not* a
+cross-reference but an **OCR splice**: MinerU folded the label into the surrounding prose, so
+the caption reads `"...His illness started about Fig. 24.12 years earlier..."` — the true
+label `Fig. 24.1` followed by `"2 years earlier"`. A greedy regex reads `24.12`. It is the
+same mangling seen in case 1 (`"Viral Fig. 1.1hemorrhagic fevers"`), just landing on a digit.
+
+The fix is a **count guard**: a figure number cannot exceed the number of images in the case.
+Case 24 holds one image, so figure 12 is impossible and the caption is rejected. Measured
+effect over the corpus:
+
+| Guards | Caption fires | Agrees | Disagrees |
+|---|---|---|---|
+| Chapter only | 117 | 116 | **1** |
+| Chapter + count | 116 | 116 | **0** |
+
+One fewer confirmation, zero disagreements — the right trade, because the lost confirmation
+was wrong. **Final resolver numbers: 142/142 figures resolved, 116 independently confirmed,
+0 disagreements.** Both guards are motivated by a real corpus failure, which is what makes
+them defensible rather than arbitrary.
 
 Also feed the **caption text** alongside each image. Grounding improves a lot when the model
 gets `Fig 1.1 — "Oral bleeding in Ebola virus disease"` instead of an anonymous JPEG.

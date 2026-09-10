@@ -69,17 +69,20 @@ No case in the corpus scores 5 across all criteria, so the grader's effective ra
 range restriction that will depress any agreement statistic computed later. Worth knowing
 before computing it rather than after.
 
-**Figure resolution is now deterministic and tested.** Figures must be bound to the cases that
-cite them. Two independent methods, scored against 118 verified figure→file pairs:
+**Figure resolution is deterministic and tested.** Figures must be bound to the cases that
+cite them. Two independent methods over the 93-case corpus:
 
-| Method | Correct |
+| | Result |
 |---|---|
-| Positional (reading order in MinerU's `_content_list.json`) | 118 / 118 |
-| Caption regex + chapter guard | 96 / 118 |
+| Figures resolved (of 219 `.jpg` files, only 142 are real figures) | 142 / 142 |
+| Independently confirmed by the caption path | 116 |
 | Disagreements where both methods fire | **0** |
 
-The chapter guard matters: one case's figure caption contains a cross-reference to a figure in
-a different chapter, and naive first-match-wins mislabels it.
+Both guards on the caption path come from real corpus failures. One case credits another
+book's figure — `(Reproduced from ... Fig. 43.1.)` — so a *chapter guard* rejects labels from
+the wrong chapter. Another has the label OCR-spliced into prose, reading `"started about
+Fig. 24.12 years earlier"` when the label is `Fig. 24.1` and the text is `"2 years earlier"`;
+a *count guard* rejects it, since that case holds one image and figure 12 cannot exist.
 
 ## Data governance
 
@@ -105,7 +108,7 @@ Provenance and licensing detail will live in `DATASHEET.md`, following
 Requires Python ≥ 3.11.
 
 ```bash
-git clone https://github.com/phuclhp1922/medical-vlm-curator.git
+git clone https://github.com/phuclhp1922/Medical_Data_Extractor.git
 cd medical-vlm-curator
 python -m venv .venv
 source .venv/Scripts/activate      # macOS/Linux: source .venv/bin/activate

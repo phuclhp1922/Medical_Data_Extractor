@@ -9,11 +9,6 @@ only that the code does what the code does. The fixtures and the skipped stubs b
 harness; filling in the ``assert`` lines is yours. See ``teaching/learning-records/0001``.
 """
 
-# ruff: noqa: F401
-# The imports below are unused *only* while the assertions are stubs -- every one of them is
-# named in a stub docstring. Delete this directive once the stubs are filled in; if ruff then
-# still reports an unused import, that is a test you have not written.
-
 from pathlib import Path
 
 import pytest
@@ -30,7 +25,6 @@ from curator.config import (
     GradeThresholds,
     corpus_dir_from_env,
 )
-from curator.figures import corpus_root
 
 TODO = "assertion is yours -- see the authorship note in this module's docstring"
 
@@ -92,7 +86,7 @@ def test_defaults_when_env_is_empty(empty_env):
 
     assert cfg.curator_model == DEFAULT_CURATOR_MODEL
     assert cfg.max_refines == DEFAULT_MAX_REFINES
-    assert cfg.corpus_dir == Path(DEFAULT_CORPUS_DIR)
+    assert cfg.corpus_dir == DEFAULT_CORPUS_DIR
 
 def test_blank_values_are_treated_as_absent(blank_env):
     """A present-but-empty variable must fall back to the default, not to ``""``.
@@ -104,7 +98,7 @@ def test_blank_values_are_treated_as_absent(blank_env):
 
     assert cfg.curator_model == DEFAULT_CURATOR_MODEL
     assert cfg.max_refines == DEFAULT_MAX_REFINES
-    assert cfg.corpus_dir == Path(DEFAULT_CORPUS_DIR)
+    assert cfg.corpus_dir == DEFAULT_CORPUS_DIR
 
 
 def test_env_overrides_defaults(full_env):
@@ -126,8 +120,8 @@ def test_corpus_root_agrees_with_config(clean_os_environ):
     ``DEFAULT_CORPUS_DIR`` under a cleaned environment. Tautological by construction -- which
     is the point: it fails loudly if someone reintroduces a second default.
     """
-    cfg = Configuration.from_env(clean_os_environ)
-    assert figures.corpus_root() == corpus_dir_from_env(clean_os_environ)
+    assert figures.corpus_root() == DEFAULT_CORPUS_DIR
+    assert corpus_dir_from_env(clean_os_environ) == DEFAULT_CORPUS_DIR
 
 
 def test_corpus_dir_is_a_path(empty_env):

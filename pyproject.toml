@@ -57,6 +57,12 @@ extend-exclude = ["notebooks/archive"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# Prompt text is prose sent verbatim to a model, not code. Re-wrapping a line changes the
+# bytes the model sees -- and once T2 step 6 hashes RULES, it changes the version hash too.
+# Same reasoning as extend-exclude above. F/I/UP/B still apply: those catch real defects.
+"src/curator/prompts/*.py" = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Tests needing the real corpus are marked `corpus`; tests that spend API

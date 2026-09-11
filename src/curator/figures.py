@@ -1,8 +1,10 @@
+import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
-import os 
-import re
-import json 
+
+from curator.config import corpus_dir_from_env
+
 
 @dataclass(frozen=True) 
 class Figure:
@@ -45,9 +47,17 @@ class CorpusError(Exception):
 def corpus_root() -> Path:
     """Return the root directory of the corpus.
 
-    This function would typically determine the path to the corpus based on configuration
-    or environment variables. For the purpose of this example, it returns a placeholder string."""
-    return Path(os.environ.get("CURATOR_CORPUS_DIR", "extracted_data"))
+    Delegates to :mod:`curator.config`, which owns ``CURATOR_CORPUS_DIR`` and its default.
+    Kept as a function here so existing callers and tests need no change.
+
+    The arrow points this way -- figures depends on config, never the reverse -- because
+    everything in the package depends on config, and that inbound traffic is what makes it
+    the stable module (Clean Architecture ch14, SDP). Reversing it would close a cycle.
+
+    Returns:
+        Path: The configured corpus root.
+    """
+    return corpus_dir_from_env()
 
 
 

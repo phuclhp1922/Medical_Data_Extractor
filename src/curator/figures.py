@@ -124,8 +124,9 @@ def chapter_of(path: Path) -> int:
 def resolve_case(case_dir: Path) -> list[Figure]:
     """Resolve a case directory into its constituent parts.
 
-    This function would typically read metadata and other relevant information from the case directory.
-    For the purpose of this example, it returns a placeholder list of Figure objects."""
+    This function would typically read metadata and other relevant information from the case
+    directory. For the purpose of this example, it returns a placeholder list of Figure
+    objects."""
     content_dir = Path(f"{case_dir}/auto") 
     chapter = chapter_of(case_dir) 
     files = list(content_dir.glob("*_content_list.json"))
@@ -133,7 +134,7 @@ def resolve_case(case_dir: Path) -> list[Figure]:
     if not files:
         raise CorpusError(f"No _content_list.json found for {chapter} in {content_dir}")
     
-    with open(files[0], 'r', encoding='utf-8') as file:
+    with open(files[0], encoding='utf-8') as file:
         data = json.load(file) 
 
     images = [item for item in data if item.get("type") == "image"] 
@@ -147,7 +148,9 @@ def resolve_case(case_dir: Path) -> list[Figure]:
         label = f"Fig. {chapter}.{position}"
         caption_label = _caption_label(caption, chapter, image_count)
 
-        figures.append(Figure(label=label, image_path=image_path, caption=caption, caption_label=caption_label))
+        figures.append(
+            Figure(label=label, image_path=image_path, caption=caption, caption_label=caption_label)
+        )
 
     return figures
 

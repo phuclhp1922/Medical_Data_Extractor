@@ -98,12 +98,13 @@ class GradeThresholds:
             bool: True if the grading passes all thresholds, False otherwise.
         """
         return (
-            grading.get("case_presentation_score", 0) >= self.case_presentation_score and
-            grading.get("images_usefulness_score", 0) >= self.images_usefulness_score and
-            grading.get("integrative_reasoning_score", 0) >= self.integrative_reasoning_score and
-            grading.get("transparency_score", 0) >= self.transparency_score and
-            grading.get("differential_diagnosis_score", False) == self.differential_diagnosis_score and
-            grading.get("final_diagnosis_score", False) == self.final_diagnosis_score
+            grading.get("case_presentation_score", 0) >= self.case_presentation_score
+            and grading.get("images_usefulness_score", 0) >= self.images_usefulness_score
+            and grading.get("integrative_reasoning_score", 0) >= self.integrative_reasoning_score
+            and grading.get("transparency_score", 0) >= self.transparency_score
+            and grading.get("differential_diagnosis_score", False)
+            == self.differential_diagnosis_score
+            and grading.get("final_diagnosis_score", False) == self.final_diagnosis_score
         )
     
 

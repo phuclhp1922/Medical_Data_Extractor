@@ -6,15 +6,14 @@ the model is told can be tested without ever calling a model.
 
 **Note on authorship.** The agent wrote all of ``curator/prompts/``, so it has not written the
 assertions that pin it -- a test written by whoever wrote the code proves only that the code
-does what the code does. The helpers and the skipped stubs below are the harness; filling in
-the ``assert`` lines is yours. See ``teaching/learning-records/0001``.
+does what the code does. The helpers below are the agent's; every ``assert`` in this file was
+written by the author of the tests, not the author of the code. See
+``teaching/learning-records/0001``.
 """
 
 import pytest
 
 from curator.prompts import editor, extractor, fingerprint, grader
-
-TODO = "assertion is yours -- see the authorship note in this module's docstring"
 
 # A token that cannot occur in real prompt text, so counting it is unambiguous.
 SENTINEL = "ZZQQ_CASE_SENTINEL"
@@ -63,7 +62,7 @@ PROMPT_MODULES = [
 
 
 # --------------------------------------------------------------------------------------
-# The split holds  [yours] -- replace pytest.skip with the assertion in each docstring
+# The split holds
 # --------------------------------------------------------------------------------------
 
 
@@ -113,7 +112,7 @@ def test_invariant_text_precedes_the_case(module):
 
 
 # --------------------------------------------------------------------------------------
-# The section 2.2 fix  [yours] -- the regression test for the empty-rulebook bug
+# The section 2.2 fix -- the regression test for the empty-rulebook bug
 # --------------------------------------------------------------------------------------
 
 
@@ -156,13 +155,22 @@ def test_retry_shares_the_extractor_spec():
 
 
 # --------------------------------------------------------------------------------------
-# Fingerprints  [yours]
+# Fingerprints
 # --------------------------------------------------------------------------------------
 
 
 def test_fingerprint_algorithm_is_pinned():
     """``fingerprint`` is SHA-256, UTF-8, truncated to 12 hex characters -- and stays that way.
 
+    ``2cf24dba5fb0`` is the first 12 characters of the real SHA-256 of ``"hello"``, brought in
+    from outside this codebase. That is the point: an expected value computed by the code under
+    test is not a test at all, which is why the obvious version of this -- asserting
+    ``fingerprint(x) == fingerprint(x)`` -- asserts nothing.
+
+    What this catches is someone changing the algorithm. Swap SHA-256 for MD5 and the value
+    becomes ``5d41402abc4b``; change ``FINGERPRINT_CHARS`` and the length moves. Either would
+    silently make every previously recorded version uncomparable with every new one, destroying
+    the ability to say which rubric produced which score.
     """
     assert fingerprint("hello") == "2cf24dba5fb0"
 

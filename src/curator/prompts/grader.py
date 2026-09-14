@@ -1,5 +1,10 @@
 """Quality-grader prompt.
 
+The grading criteria (thoroughness of case presentation, explicit differential diagnosis,
+dependence on integrative reasoning, transparency of diagnostic reasoning, stated final
+diagnosis) are adapted from the candidate-selection criteria of MedCaseReasoning (Wu et al.,
+2025, arXiv:2505.11733).
+
 Rubric text landed verbatim from ``notebooks/archive/03_curation_loop_langgraph.ipynb`` cell 12,
 then split at the point where it first touches a variable (T2 step 2).
 

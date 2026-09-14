@@ -1,5 +1,9 @@
 """Editor (audit) prompt.
 
+The faithfulness audit by a separate LLM is adapted from the quality-filter stage of
+MedCaseReasoning (Wu et al., 2025, arXiv:2505.11733). There, flagged cases are discarded; here,
+flags are sent back to the extractor for refinement.
+
 Landed from ``notebooks/archive/03_curation_loop_langgraph.ipynb`` cell 14, then split and
 repaired (T2 steps 2, 4 and 5).
 

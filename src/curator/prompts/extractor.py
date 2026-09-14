@@ -1,5 +1,8 @@
 """Extractor prompts, first pass and retry.
 
+The output structure (case prompt, numbered reasoning points each backed by a direct quote,
+final diagnosis) is adapted from MedCaseReasoning (Wu et al., 2025, arXiv:2505.11733).
+
 Landed from ``notebooks/archive/03_curation_loop_langgraph.ipynb`` cells 13 and 15, then split
 at the point where the text first touches a variable (T2 step 2).
 

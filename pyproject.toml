@@ -11,8 +11,8 @@ requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 # NOTE: the MIT license covers the CODE only. The curated dataset derives from
-# copyrighted source material and is NOT redistributable. See README.md and
-# DATASHEET.md - do not restate the dataset terms inside LICENSE itself.
+# copyrighted source material and is NOT redistributable. See README.md (and
+# DATASHEET.md, planned) - do not restate the dataset terms inside LICENSE itself.
 
 dependencies = [
     "langgraph>=0.2",

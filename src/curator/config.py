@@ -14,6 +14,10 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from curator.schemas import Grading
 
 # --------------------------------------------------------------------------------------
 # Environment variable names. Mirrors .env.example - keep the two in step.
@@ -84,11 +88,11 @@ class GradeThresholds:
     images_usefulness_score: int = 3
     integrative_reasoning_score: int = 3
     transparency_score: int = 3
-    differential_diagnosis_score: bool = True
-    final_diagnosis_score: bool = True
+    differential_diagnosis_present: bool = True
+    final_diagnosis_present: bool = True
 
     # the four >=3 gates and the two Yes/No gates, at today's values
-    def passes(self, grading) -> bool: 
+    def passes(self, grading: 'Grading') -> bool:
         """Determine if the grading passes all thresholds.
 
         Args:
@@ -97,16 +101,18 @@ class GradeThresholds:
         Returns:
             bool: True if the grading passes all thresholds, False otherwise.
         """
-        return (
-            grading.get("case_presentation_score", 0) >= self.case_presentation_score
-            and grading.get("images_usefulness_score", 0) >= self.images_usefulness_score
-            and grading.get("integrative_reasoning_score", 0) >= self.integrative_reasoning_score
-            and grading.get("transparency_score", 0) >= self.transparency_score
-            and grading.get("differential_diagnosis_score", False)
-            == self.differential_diagnosis_score
-            and grading.get("final_diagnosis_score", False) == self.final_diagnosis_score
-        )
-    
+        if not grading.is_case_report:
+            return False
+        else: 
+            return (
+                grading.case_presentation_score >= self.case_presentation_score and
+                grading.images_usefulness_score >= self.images_usefulness_score and
+                grading.integrative_reasoning_score >= self.integrative_reasoning_score and
+                grading.transparency_score >= self.transparency_score and
+                grading.differential_diagnosis_present == self.differential_diagnosis_present and
+                grading.final_diagnosis_present == self.final_diagnosis_present
+            )
+ 
 
 @dataclass(frozen=True)
 class Configuration:

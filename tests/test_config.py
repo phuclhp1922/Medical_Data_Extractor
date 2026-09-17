@@ -25,6 +25,7 @@ from curator.config import (
     GradeThresholds,
     corpus_dir_from_env,
 )
+from curator.schemas import Grading
 
 TODO = "assertion is yours -- see the authorship note in this module's docstring"
 
@@ -139,33 +140,27 @@ def test_corpus_dir_is_a_path(empty_env):
 # --------------------------------------------------------------------------------------
 
 
-def _grading(**overrides) -> dict:
-    """Build a grading dict that passes every gate, then apply ``overrides``.
-
-    Keys match the notebook's grader output so the port stays faithful. Becomes a
-    ``Grading`` model in T3 step 7.
+def _grading(**overrides) -> Grading:
+    """Build a ``Grading`` that passes every gate, then apply ``overrides``.
 
     Args:
         **overrides: Fields to replace in the all-passing baseline.
 
     Returns:
-        dict: The grading payload.
+        Grading: A validated grading.
     """
-    # NOTE: the notebook's grader emitted the *strings* "Yes"/"No" for the two boolean gates,
-    # and an earlier version of this helper used them. `GradeThresholds.passes` compares
-    # against bools, which is right -- T3's `Grading` schema makes them bools -- so the helper
-    # now matches that. If you ever run `passes()` against raw notebook output, "Yes" == True
-    # is False and the gate rejects everything.
     grading = {
+        "think": "baseline reasoning",
+        "is_case_report": True,
         "case_presentation_score": 4,
         "integrative_reasoning_score": 4,
         "transparency_score": 4,
         "images_usefulness_score": 4,
-        "differential_diagnosis_score": True,
-        "final_diagnosis_score": True,
+        "differential_diagnosis_present": True,
+        "final_diagnosis_present": True,
     }
     grading.update(overrides)
-    return grading
+    return Grading.model_validate(grading)
 
 
 def test_gate_accepts_a_passing_grading():
@@ -193,10 +188,10 @@ def test_gate_rejects_a_score_below_threshold():
 def test_gate_rejects_a_no():
     """One True/False gate answered False -> False.
     """
-    grading = _grading(differential_diagnosis_score=False)
+    grading = _grading(differential_diagnosis_present=False)
     assert GradeThresholds().passes(grading) is False
 
-    grading = _grading(final_diagnosis_score=False)
+    grading = _grading(final_diagnosis_present=False)
     assert GradeThresholds().passes(grading) is False
 
 
@@ -211,3 +206,19 @@ def test_thresholds_are_actually_read():
     grading = _grading(case_presentation_score=3)
     assert GradeThresholds().passes(grading) is True
     assert GradeThresholds(case_presentation_score=4).passes(grading) is False
+
+
+def test_gate_rejects_a_non_case_report_even_with_perfect_scores():
+    """``is_case_report=False`` -> False, whatever the scores say.
+
+    D13's guard. Strict mode forces the grader to emit four scores even for an article with no
+    patient in it, and those numbers mean nothing. Build ``_grading(is_case_report=False)`` with
+    every score at 5 -- the case most likely to slip through -- and assert ``passes`` is False.
+    Without the guard, this grading clears every threshold and goes on to the extractor.
+    """
+    grading = _grading(
+        is_case_report=False,
+        case_presentation_score=5,
+        integrative_reasoning_score=5,
+    )
+    assert GradeThresholds().passes(grading) is False

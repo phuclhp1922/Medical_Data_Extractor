@@ -59,23 +59,6 @@ _CHECKLIST = """
         - Final diagnosis is reasonably deducible from the case-presentation facts. — i.e., the final diagnosis should not depend entirely on some test, imaging, or lab result not given in the case presentation.
       E. No Hallucinations Anywhere
         - Every datum, quote, or diagnosis is found in the case report.
-
-      Example when problems exist:
-        <flags>
-          FLAG: SOURCE_FIDELITY
-          FLAG: REASONING_EXTRA_INFO
-        </flags>
-
-        <editor_comments>
-          SOURCE_FIDELITY: Mentions family history of SLE," not present in article.
-          REASONING_EXTRA_INFO: Rationale cites a biopsy result that is not included in the case_prompt.
-        </editor_comments>
-
-    OUTPUT WHEN EVERYTHING PASSES:
-        <flags>
-          NONE
-        </flags>
-        <editor_comments></editor_comments>
     """
 
 # The audit spec, assembled once at import. ``extractor.RULES`` is spliced in at the slot the

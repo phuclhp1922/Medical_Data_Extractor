@@ -185,6 +185,13 @@ Until these agree, the flags are inconsistent and the error taxonomy is unusable
 > parse. Prefer this over fixing the prompt text by hand — a schema makes the bug
 > *impossible* rather than merely *fixed*.
 
+**Resolved differently in T3 — see D12 (2026-09-16).** The schema route was taken, but *not* with
+the five fault-type names above. Writing a fault vocabulary now means enumerating faults having
+observed none (§2.6), and Phase 3 below already schedules the taxonomy for *after* collection. The
+verdict is instead a list of concerns, each pairing a closed enum over the editor checklist's own
+headings A–E with a **required** free-text explanation. Countable for Phase 3, and re-codable from
+the retained text if the sections prove wrong.
+
 ### 2.6 The editor has never rejected anything — 0 flags in 51 cases
 
 This is the most important number in this document and it comes straight out of notebook 2's
@@ -192,7 +199,7 @@ saved output. Cell 23 prints `{source} extracted with {count} loops` for every c
 **51** lines read `with 1 loops`. `count` starts at 1 and increments once per refine, so
 **every single case passed the editor on the first attempt.**
 
-An auditor with a 0% rejection rate across 51 samples is not auditing. There are **two
+An auditor with a 0% rejection rate across 51 samples is not auditing. There are **three
 candidate causes, and they are confounded** — separating them is now a Phase 2 deliverable:
 
 1. **The empty rubric (§2.2).** It was auditing compliance against an empty string.
@@ -201,6 +208,12 @@ candidate causes, and they are confounded** — separating them is now a Phase 2
    switched to Gemma. The code still carries the fossils: the variable is named **`MODEL_2`
    with no `MODEL_1` anywhere in any notebook**, and the key is **`GEMINI_API_KEY_3`** — the
    third of a rotating set. Both notebooks inherited the constant unchanged.
+3. **A refusal was recorded as an approval.** *(Added 2026-09-12 from the T2/T3 audit; learning
+   record 0002.)* `review_case` substituted `flags = "NONE"` when the response was empty or a
+   refusal — indistinguishable downstream from an editor that read the draft and found nothing
+   wrong. Unlike causes 1 and 2 this one is not about the editor's judgement at all: it is a
+   mechanism that converts *no answer* into *clean*, and it biases the flag rate toward zero
+   independently of which model ran or what rubric it held. T3 closes it with a typed error.
 
 Cause 2 matters more than it looks. A 27B instruction-tuned model asked to perform adversarial
 audit against a long checklist is close to worst-case for that model class: critique is harder
@@ -647,7 +660,9 @@ regenerate the corpus** — treat `d:/extracted_data` as the golden reference an
 divergence. Regenerating invalidates any calibration done against it.
 
 ### Phase 3 — Rubric, taxonomy, self-consistency (week 4, ~8h)
-1. Fix the flag vocabulary (§2.5) — nothing downstream works until this is consistent.
+1. ~~Fix the flag vocabulary (§2.5)~~ — done in T3 (D12). What remains here is the other half:
+   **code the collected free-text explanations into a fault taxonomy** and check whether it beats
+   the five checklist sections. That is now a job with data behind it.
 2. Give the editor a **graded** rubric, not binary flags, so it becomes calibratable too.
 3. Error taxonomy over collected flags; report the distribution.
 4. Self-consistency: sample the judge k=5 at temperature ~0.7. Check whether high-variance

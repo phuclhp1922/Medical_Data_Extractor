@@ -7,7 +7,7 @@
 # committed to a public repository.
 #
 # Commit: code, aggregate metrics, plots, paraphrased illustrative examples.
-# See PLAN.md section 5 and DATASHEET.md for the provenance rationale.
+# See PLAN.md section 5 (and DATASHEET.md, planned) for the provenance rationale.
 #
 # NOTE: .gitignore cannot protect you from outputs saved INSIDE a notebook.
 # Use nbstripout (see PLAN.md) - the original prototype carried ~199KB of
@@ -66,3 +66,6 @@ htmlcov/
 .idea/
 Thumbs.db
 desktop.ini
+
+teaching/
+scratchboard/

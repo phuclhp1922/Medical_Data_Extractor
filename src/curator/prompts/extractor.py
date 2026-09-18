@@ -140,7 +140,7 @@ _FIRST_TRY_INTRO = """
     - Summarize the final diagnosis of the patient.
     - Understand the text because some parts are splited due to the layout.
     - Check for formatting errors and typo and fix them.
-  """ + RULES 
+  """ + RULES
 
 
 _RETRY_INTRO = """

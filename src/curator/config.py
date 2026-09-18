@@ -28,9 +28,11 @@ CURATOR_MODEL_ENV = "CURATOR_MODEL"
 JUDGE_MODEL_ENV = "JUDGE_MODEL"
 TEMPERATURE_ENV = "CURATOR_TEMPERATURE"
 MAX_REFINES_ENV = "CURATOR_MAX_REFINES"
+PAUSE_SECONDS_ENV = "CURATOR_PAUSE_SECONDS"
+REQUEST_RETRIES_ENV = "CURATOR_REQUEST_RETRIES"
+
 
 DEFAULT_CORPUS_DIR = Path("extracted_data")
-
 # NOTE: the model ids are YOUR decision, not mine, and they are Phase 2 material.
 # `gpt-4o-mini` is a placeholder that certainly exists; check for a current id before the
 # first real run. JUDGE_MODEL is deliberately left empty because .env.example requires it to
@@ -38,9 +40,10 @@ DEFAULT_CORPUS_DIR = Path("extracted_data")
 # 2.6 - and there is no sane cross-family default to pick on your behalf.
 DEFAULT_CURATOR_MODEL = "gpt-4o-mini"
 DEFAULT_JUDGE_MODEL = ""
-
 DEFAULT_TEMPERATURE = 0.1
 DEFAULT_MAX_REFINES = 3
+DEFAULT_PAUSE_SECONDS = 5.0
+DEFAULT_REQUEST_RETRIES = 2
 
 
 def _get(env: Mapping[str, str], name: str, default: str) -> str:
@@ -103,7 +106,7 @@ class GradeThresholds:
         """
         if not grading.is_case_report:
             return False
-        else: 
+        else:
             return (
                 grading.case_presentation_score >= self.case_presentation_score and
                 grading.images_usefulness_score >= self.images_usefulness_score and
@@ -112,17 +115,18 @@ class GradeThresholds:
                 grading.differential_diagnosis_present == self.differential_diagnosis_present and
                 grading.final_diagnosis_present == self.final_diagnosis_present
             )
- 
+
 
 @dataclass(frozen=True)
 class Configuration:
-    # curator_model, judge_model, temperature, max_refines, corpus_dir
     curator_model: str
     judge_model: str
     temperature: float
     max_refines: int
     corpus_dir: Path
     thresholds: GradeThresholds
+    pause_seconds: float
+    request_retries: int
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Configuration":
@@ -146,5 +150,7 @@ class Configuration:
             temperature=float(_get(env, TEMPERATURE_ENV, str(DEFAULT_TEMPERATURE))),
             max_refines=int(_get(env, MAX_REFINES_ENV, str(DEFAULT_MAX_REFINES))),
             corpus_dir=corpus_dir_from_env(env),
-            thresholds=GradeThresholds()
+            thresholds=GradeThresholds(),
+            pause_seconds=float(_get(env, PAUSE_SECONDS_ENV, str(DEFAULT_PAUSE_SECONDS))),
+            request_retries=int(_get(env, REQUEST_RETRIES_ENV, str(DEFAULT_REQUEST_RETRIES)))
         )

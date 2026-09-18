@@ -70,10 +70,10 @@ PROMPT_MODULES = [
 def test_rules_are_non_empty(module):
     """Every module's ``RULES`` has content.
 
-    Catches a split that cut at the wrong point and left the constant hollow -- 
+    Catches a split that cut at the wrong point and left the constant hollow --
     which would ship a prompt with no instructions in it.
     """
-    assert module.RULES.strip(), f"{module.__name__}.RULES is empty" 
+    assert module.RULES.strip(), f"{module.__name__}.RULES is empty"
 
 @pytest.mark.parametrize("module", PROMPT_MODULES)
 def test_rules_hold_no_placeholder(module):
@@ -90,7 +90,7 @@ def test_rules_hold_no_placeholder(module):
 def test_render_includes_its_rules(module):
     """The rendered payload still contains the spec it was built from.
 
-    Catches a renderer that stopped concatenating ``RULES`` -- 
+    Catches a renderer that stopped concatenating ``RULES`` --
     the model would then be asked to do the job with no rules at all.
     """
     assert module.RULES in _payload(module), (
@@ -103,7 +103,7 @@ def test_invariant_text_precedes_the_case(module):
     """Constants come first in the payload, the per-case text last.
 
     This one is about money, not correctness. Providers cache on *prefix*: a payload that opens
-    with ~4 KB of invariant rubric gets a cache hit on that rubric across all 93 cases. 
+    with ~4 KB of invariant rubric gets a cache hit on that rubric across all 93 cases.
     """
     payload = _payload(module)
     assert payload.index(module.RULES) < payload.index(SENTINEL), (

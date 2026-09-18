@@ -6,7 +6,7 @@ from pathlib import Path
 from curator.config import corpus_dir_from_env
 
 
-@dataclass(frozen=True) 
+@dataclass(frozen=True)
 class Figure:
     """A data class representing a figure in the corpus.
 
@@ -16,7 +16,7 @@ class Figure:
         caption (str): The caption text for the figure.
         caption_label (str | None): The label extracted from the caption, if available.
     """
-    label: str 
+    label: str
     image_path: Path
     caption: str
     caption_label: str | None
@@ -78,7 +78,7 @@ def _caption_label(caption: str, chapter: int, image_count: int) -> str | None:
     # Check if the chapter matches and the figure number is within the image count
     if fig_chapter == chapter and 1 <= fig_number <= image_count:
         return f"Fig. {fig_chapter}.{fig_number}"
-    
+
     return None
 
 
@@ -87,7 +87,7 @@ def agreement_report(resolved: dict[str, list[Figure]]) -> dict[str, int]:
 
     This function analyzes the resolved case data and counts the number of cases, figures,
     and how many figures are confirmed by captions. It returns a dictionary with these counts."""
-    
+
     cases = len(resolved)
     figures = sum(len(figures) for figures in resolved.values())
     caption_confirmed = sum(
@@ -118,7 +118,7 @@ def chapter_of(path: Path) -> int:
     match = re.match(r"(\d+)-", Path(path).name)
     if not match:
         raise CorpusError(f"Directory name '{path}' does not start with a chapter number.")
-    return int(match.group(1)) 
+    return int(match.group(1))
 
 
 def resolve_case(case_dir: Path) -> list[Figure]:
@@ -127,23 +127,23 @@ def resolve_case(case_dir: Path) -> list[Figure]:
     This function would typically read metadata and other relevant information from the case
     directory. For the purpose of this example, it returns a placeholder list of Figure
     objects."""
-    content_dir = Path(f"{case_dir}/auto") 
-    chapter = chapter_of(case_dir) 
+    content_dir = Path(f"{case_dir}/auto")
+    chapter = chapter_of(case_dir)
     files = list(content_dir.glob("*_content_list.json"))
 
     if not files:
         raise CorpusError(f"No _content_list.json found for {chapter} in {content_dir}")
-    
+
     with open(files[0], encoding='utf-8') as file:
-        data = json.load(file) 
+        data = json.load(file)
 
-    images = [item for item in data if item.get("type") == "image"] 
+    images = [item for item in data if item.get("type") == "image"]
 
-    image_count = len(images) 
+    image_count = len(images)
     figures = []
 
     for position, item in enumerate(images, start=1):
-        caption = " ".join(item.get("image_caption", [])) 
+        caption = " ".join(item.get("image_caption", []))
         image_path = content_dir / item.get("img_path", "")
         label = f"Fig. {chapter}.{position}"
         caption_label = _caption_label(caption, chapter, image_count)
@@ -165,7 +165,7 @@ def resolve_corpus() -> dict[str, list[Figure]]:
 
     case_dirs = [p for p in corpus_dir.iterdir() if p.is_dir()]
 
-    for case_dir in sorted(case_dirs, key=lambda x: chapter_of(x)):   
+    for case_dir in sorted(case_dirs, key=lambda x: chapter_of(x)):
         figures = resolve_case(case_dir)
         resolved[case_dir.name] = figures
 

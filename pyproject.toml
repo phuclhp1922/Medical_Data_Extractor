@@ -55,13 +55,18 @@ target-version = "py311"
 extend-exclude = ["notebooks/archive"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "W", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.per-file-ignores]
 # Prompt text is prose sent verbatim to a model, not code. Re-wrapping a line changes the
 # bytes the model sees -- and once T2 step 6 hashes RULES, it changes the version hash too.
 # Same reasoning as extend-exclude above. F/I/UP/B still apply: those catch real defects.
-"src/curator/prompts/*.py" = ["E501"]
+#
+# W291/W293 for the same reason, one level finer: whitespace inside a prompt template is
+# content, and a linter must never be the reason a prompt changed. Ruff already declines to
+# fix these on its own (it classes them unsafe inside strings); this makes that permanent
+# rather than a property of its safety classifier.
+"src/curator/prompts/*.py" = ["E501", "W291", "W293"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

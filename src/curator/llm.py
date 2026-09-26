@@ -42,10 +42,14 @@ from curator.schemas import Role
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
-#: Environment variable holding the key for the extractor/grader roles. The judge reads a
-#: different one (``JUDGE_API_KEY``) because D4 requires a different model family; pass it as
-#: ``api_key_env`` when Phase 2 needs it.
+#: Environment variable holding the key for the extractor/grader roles.
 DEFAULT_API_KEY_ENV = "OPENAI_API_KEY"
+
+#: Environment variable holding the editor/judge key. A separate variable because D4 requires a
+#: different model *family*, which in practice means a different vendor and therefore a
+#: different key -- and because a judge that silently fell back to the curator key would
+#: reproduce the self-enhancement setup it exists to avoid, with nothing in the record saying so.
+JUDGE_API_KEY_ENV = "JUDGE_API_KEY"
 
 # When the most recent request finished, on the monotonic clock. Module-level on purpose: the
 # quota belongs to the key, so two LLM instances sharing one key must share one clock. `None`
@@ -102,11 +106,12 @@ def reset_pacing() -> None:
 
 
 @cache
-def _client(api_key_env: str, request_retries: int) -> OpenAI:
-    """Return the shared client for one key and retry policy, building it on first use.
+def _client(api_key_env: str, request_retries: int, base_url: str | None = None) -> OpenAI:
+    """Return the shared client for one key, retry policy and endpoint, building it on first use.
 
     Cached because a client holds a connection pool: one per key is the point of having one.
-    Keyed on both arguments so the Phase 2 judge, which reads a different variable, gets its own.
+    Keyed on all three arguments so the editor's judge, which reads a different variable and may
+    point somewhere else entirely, gets its own.
 
     Built lazily rather than at import so that importing ``llm`` -- which ``nodes.py`` does
     unconditionally -- does not require a key to be set.
@@ -116,6 +121,10 @@ def _client(api_key_env: str, request_retries: int) -> OpenAI:
         request_retries (int): How many times the SDK retries a failed request itself, with its
             own exponential backoff. This covers transport faults and 429s, which
             ``parsing.interpret_response`` deliberately does not map to curation errors.
+        base_url (str | None): Endpoint to talk to, or ``None`` for OpenAI's own. A non-OpenAI
+            vendor is reachable this way **only if it serves the Responses API**: everything
+            below ``LLM.parse`` is written against that shape, not merely against this SDK.
+            See ``review_case`` for what that means for the judge.
 
     Returns:
         OpenAI: The client.
@@ -124,7 +133,9 @@ def _client(api_key_env: str, request_retries: int) -> OpenAI:
         KeyError: The variable is unset. Loud on purpose: a missing key is a setup fault, and
             every alternative here is a default that turns it into an auth error later.
     """
-    return OpenAI(api_key=os.environ[api_key_env], max_retries=request_retries)
+    return OpenAI(
+        api_key=os.environ[api_key_env], max_retries=request_retries, base_url=base_url
+    )
 
 
 # --------------------------------------------------------------------------------------
@@ -146,12 +157,21 @@ class LLM:
         pause_seconds (float): Minimum interval between requests sharing this key.
         request_retries (int): Passed to the SDK as ``max_retries``.
         api_key_env (str): Which environment variable holds the key.
+        base_url (str | None): Endpoint override, for a role pointed at another vendor. ``None``
+            means OpenAI's own. Part of the identity of the client, so two ``LLM``s differing
+            only here do not share a connection pool or a key.
+        temperature (float | None): Sent with every request when set; **omitted** when
+            ``None``. Reasoning models reject the parameter outright, so "not sent" has to be
+            expressible -- and it is a different request from sending any number, which is why
+            this is ``None`` rather than a default value.
     """
 
     model: str
     pause_seconds: float
     request_retries: int
     api_key_env: str = DEFAULT_API_KEY_ENV
+    temperature: float | None = None
+    base_url: str | None = None
 
     def parse(
         self,
@@ -172,8 +192,9 @@ class LLM:
             input (str | ResponseInputParam): The prompt, as text or as content parts.
             case_id (str): The case directory name, recorded on any error raised.
             role (Role): Which role is calling, recorded on any error raised.
-            **options (Any): Passed through to the request unchanged -- ``temperature``,
-                ``max_output_tokens`` and so on.
+            **options (Any): Passed through to the request unchanged -- ``max_output_tokens``
+                and so on. Not ``temperature``: that belongs to the ``LLM``, and passing it
+                here as well raises ``TypeError`` rather than silently picking one.
 
         Returns:
             ModelT: The validated answer.
@@ -185,15 +206,17 @@ class LLM:
             openai.APIError: A transport failure that survived ``request_retries`` attempts.
                 Not a curation outcome, so it is not mapped to one.
         """
+        sampling = {} if self.temperature is None else {"temperature": self.temperature}
         _wait_turn(self.pause_seconds)
         try:
             return parse_structured(
-                _client(self.api_key_env, self.request_retries),
+                _client(self.api_key_env, self.request_retries, self.base_url),
                 schema=schema,
                 model=self.model,
                 input=input,
                 case_id=case_id,
                 role=role,
+                **sampling,
                 **options,
             )
         finally:

@@ -27,7 +27,9 @@ CORPUS_DIR_ENV = "CURATOR_CORPUS_DIR"
 CURATOR_MODEL_ENV = "CURATOR_MODEL"
 JUDGE_MODEL_ENV = "JUDGE_MODEL"
 TEMPERATURE_ENV = "CURATOR_TEMPERATURE"
+JUDGE_TEMPERATURE_ENV = "JUDGE_TEMPERATURE"
 MAX_REFINES_ENV = "CURATOR_MAX_REFINES"
+JUDGE_BASE_URL_ENV = "JUDGE_BASE_URL"
 PAUSE_SECONDS_ENV = "CURATOR_PAUSE_SECONDS"
 REQUEST_RETRIES_ENV = "CURATOR_REQUEST_RETRIES"
 
@@ -41,6 +43,17 @@ DEFAULT_CORPUS_DIR = Path("extracted_data")
 DEFAULT_CURATOR_MODEL = "gpt-4o-mini"
 DEFAULT_JUDGE_MODEL = ""
 DEFAULT_TEMPERATURE = 0.1
+# The one value of CURATOR_TEMPERATURE that is not a number: it omits the parameter from the
+# request. Reasoning models reject `temperature` with a 400, so "no temperature at all" has to
+# be sayable -- and it is a different request from any number, blank included (blank means the
+# default above, which is why an empty string cannot serve as the sentinel).
+NO_TEMPERATURE = "none"
+# The judge keeps its own setting because the constraint belongs to the *model*, not to the
+# pipeline: one role can be a reasoning model that rejects `temperature` while the other is not.
+# Sharing one value forced a choice between sending it to a model that refuses it and dropping
+# it from a model that wants it -- and dropping it means the provider's default, which for
+# extraction is far higher than anything chosen here.
+DEFAULT_JUDGE_TEMPERATURE = DEFAULT_TEMPERATURE
 DEFAULT_MAX_REFINES = 3
 DEFAULT_PAUSE_SECONDS = 5.0
 DEFAULT_REQUEST_RETRIES = 2
@@ -62,6 +75,21 @@ def _get(env: Mapping[str, str], name: str, default: str) -> str:
         str: The value, or ``default``.
     """
     return env.get(name, "").strip() or default
+
+
+def _temperature(env: Mapping[str, str], name: str, default: float) -> float | None:
+    """Read a temperature, where the word ``none`` means "omit the parameter".
+
+    Args:
+        env (Mapping[str, str]): The environment mapping to read from.
+        name (str): The variable name.
+        default (float): Value to use when the variable is absent or empty.
+
+    Returns:
+        float | None: The temperature, or ``None`` to send no ``temperature`` at all.
+    """
+    raw = _get(env, name, str(default))
+    return None if raw.lower() == NO_TEMPERATURE else float(raw)
 
 
 def corpus_dir_from_env(env: Mapping[str, str] | None = None) -> Path:
@@ -121,7 +149,13 @@ class GradeThresholds:
 class Configuration:
     curator_model: str
     judge_model: str
-    temperature: float
+    #: Endpoint for the judge's vendor, or ``None`` for OpenAI's own. The key itself is never
+    #: held here (see the module docstring); only where to send it.
+    judge_base_url: str | None
+    #: Sampling temperature for the curator roles (extractor, grader); ``None`` sends none.
+    temperature: float | None
+    #: The editor's own, because it is a different model with different rules.
+    judge_temperature: float | None
     max_refines: int
     corpus_dir: Path
     thresholds: GradeThresholds
@@ -147,7 +181,11 @@ class Configuration:
         return cls(
             curator_model=_get(env, CURATOR_MODEL_ENV, DEFAULT_CURATOR_MODEL),
             judge_model=_get(env, JUDGE_MODEL_ENV, DEFAULT_JUDGE_MODEL),
-            temperature=float(_get(env, TEMPERATURE_ENV, str(DEFAULT_TEMPERATURE))),
+            judge_base_url=env.get(JUDGE_BASE_URL_ENV, "").strip() or None,
+            temperature=_temperature(env, TEMPERATURE_ENV, DEFAULT_TEMPERATURE),
+            judge_temperature=_temperature(
+                env, JUDGE_TEMPERATURE_ENV, DEFAULT_JUDGE_TEMPERATURE
+            ),
             max_refines=int(_get(env, MAX_REFINES_ENV, str(DEFAULT_MAX_REFINES))),
             corpus_dir=corpus_dir_from_env(env),
             thresholds=GradeThresholds(),

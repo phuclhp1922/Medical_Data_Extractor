@@ -30,7 +30,6 @@ change.
 """
 
 import base64
-import mimetypes
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Literal
@@ -42,10 +41,22 @@ from curator.figures import CorpusError, Figure
 #: Content-part types this module emits, in the order a request carries them.
 ContentPart = ResponseInputTextParam | ResponseInputImageParam
 
-#: Image formats the Responses API accepts. Anything else in a case directory is a corpus
-#: fault, not something to send and hope: an unsupported type comes back as a 400 whose message
-#: does not say which file caused it.
-SUPPORTED_MEDIA_TYPES = frozenset({"image/jpeg", "image/png", "image/gif", "image/webp"})
+#: Image formats the Responses API accepts, keyed by file suffix. Anything else in a case
+#: directory is a corpus fault, not something to send and hope: an unsupported type comes back as
+#: a 400 whose message does not say which file caused it.
+#:
+#: Written out rather than asked of ``mimetypes.guess_type``, which on Windows consults the
+#: registry -- so the media type of a ``.jpg`` becomes a property of whatever software is
+#: installed. A machine whose registry maps ``.jpg`` to ``image/pjpeg`` would fail every figure in
+#: the corpus (all 219 are ``.jpg``) and report it as a corpus fault. A run must not depend on the
+#: machine it runs on, least of all invisibly.
+MEDIA_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
 
 
 def _data_url(image_path: Path) -> str:
@@ -65,13 +76,13 @@ def _data_url(image_path: Path) -> str:
         FileNotFoundError: The file named by the ``Figure`` is not there. Loud on purpose --
             a resolved figure whose file has moved means the corpus and the index disagree,
             and silently dropping it would quietly shrink the evidence the model reasons from.
-        CorpusError: The file's type cannot be determined, or is not one the API accepts.
+        CorpusError: The suffix is not one the API accepts.
     """
-    media_type, _ = mimetypes.guess_type(image_path.name)
-    if media_type not in SUPPORTED_MEDIA_TYPES:
+    media_type = MEDIA_TYPES.get(image_path.suffix.lower())
+    if media_type is None:
         raise CorpusError(
-            f"{image_path} has media type {media_type!r}; "
-            f"expected one of {sorted(SUPPORTED_MEDIA_TYPES)}"
+            f"{image_path} has suffix {image_path.suffix!r}; "
+            f"expected one of {sorted(MEDIA_TYPES)}"
         )
 
     payload = base64.b64encode(image_path.read_bytes()).decode("ascii")

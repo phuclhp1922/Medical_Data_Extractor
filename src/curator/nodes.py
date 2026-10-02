@@ -23,6 +23,7 @@ configuration stays separable from what the run produced.
 
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Literal
 
 from langgraph.runtime import Runtime
 from openai.types.responses import ResponseInputParam, ResponseInputTextParam
@@ -36,7 +37,11 @@ from curator.schemas import Draft, EditorVerdict, Grading, Role
 from curator.state import CaseState, TerminalState
 
 
-def _user_message(prompt: str, figures: Sequence[Figure]) -> ResponseInputParam:
+def _user_message(
+    prompt: str,
+    figures: Sequence[Figure],
+    detail: Literal["auto", "low", "high"],
+) -> ResponseInputParam:
     """Assemble one user turn: the prompt, then each figure labelled and shown.
 
     Every role sends the same shape -- instructions first, images after -- so this is written
@@ -47,6 +52,8 @@ def _user_message(prompt: str, figures: Sequence[Figure]) -> ResponseInputParam:
     Args:
         prompt (str): The rendered prompt for this role, from ``prompts/``.
         figures (Sequence[Figure]): The case's figures. May be empty.
+        detail (Literal["auto", "low", "high"]): Image-fidelity hint, from ``Configuration``.
+            Every node passes it, so one setting moves the cost of a whole run.
 
     Returns:
         ResponseInputParam: A single-element input list holding one user message.
@@ -56,7 +63,7 @@ def _user_message(prompt: str, figures: Sequence[Figure]) -> ResponseInputParam:
             "role": "user",
             "content": [
                 ResponseInputTextParam(type="input_text", text=prompt),
-                *as_content_parts(figures),
+                *as_content_parts(figures, detail=detail),
             ],
         }
     ]
@@ -104,9 +111,9 @@ def load_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
         runtime (Runtime[Configuration]): Supplies ``corpus_dir``.
 
     Returns:
-        dict: ``source_text``, ``figures``, and ``refine_count`` set to 0 so the refine loop
-        starts from a known count. ``verdicts`` and ``drafts`` are not initialised: an
-        ``operator.add`` list channel starts empty on its own (probe E11).
+        dict: ``source_text`` and ``figures``. Nothing else needs initialising: ``verdicts``
+        and ``drafts`` are ``operator.add`` channels, which start empty on their own (probe
+        E11), and there is no pass counter to zero (D27).
 
     Raises:
         CorpusError: The directory is not readable as MinerU output.
@@ -115,11 +122,7 @@ def load_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
     source_text = _source_text(case_dir)
     figures = resolve_case(case_dir)
 
-    return {
-        "source_text": source_text,
-        "figures": figures,
-        "refine_count": 0,
-    }
+    return {"source_text": source_text, "figures": figures}
 
 
 def grade_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
@@ -161,7 +164,11 @@ def grade_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
     )
     grading = llm.parse(
         Grading,
-        input=_user_message(grader.render(state["source_text"]), state["figures"]),
+        input=_user_message(
+            grader.render(state["source_text"]),
+            state["figures"],
+            runtime.context.image_detail,
+        ),
         case_id=state["source"],
         role=Role.GRADER,
     )
@@ -211,10 +218,10 @@ def extract_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
         runtime (Runtime[Configuration]): Supplies the model id, sampling and retry policy.
 
     Returns:
-        dict: The new ``draft`` appended to ``drafts``, and ``refine_count`` **derived** as
-        ``len(verdicts)`` rather than incremented. The two can then never drift: a count kept
-        by ``+= 1`` is a second record of how many verdicts there have been, and T5's cap is
-        only meaningful if that number is the true one.
+        dict: The new ``draft`` appended to ``drafts`` -- and nothing else. No pass counter: how
+        many passes have happened is ``len(verdicts)``, read where the cap is enforced (D27). A
+        stored count would be a second record of a list's length, free to disagree with it, and
+        T5's cap is only meaningful if the number it compares is the true one.
 
     Raises:
         RefusalError: The extractor refused, or a content filter stopped the output.
@@ -247,15 +254,12 @@ def extract_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
 
     draft = llm.parse(
         Draft,
-        input=_user_message(prompt, state["figures"]),
+        input=_user_message(prompt, state["figures"], runtime.context.image_detail),
         case_id=state["source"],
         role=Role.EXTRACTOR,
     )
 
-    return {
-        "drafts": [draft],
-        "refine_count": len(state["verdicts"]),
-    }
+    return {"drafts": [draft]}
 
 
 def review_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
@@ -313,6 +317,7 @@ def review_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
                 draft.final_diagnosis,
             ),
             state["figures"],
+            runtime.context.image_detail,
         ),
         case_id=state["source"],
         role=Role.EDITOR,
@@ -330,7 +335,7 @@ def finalize(reason: TerminalState) -> Callable[[CaseState, Runtime[Configuratio
     which edge was taken rather than from re-reading the state and guessing.
 
     The alternative was one ``finalize`` that re-derived the reason from ``grading``,
-    ``verdicts`` and ``refine_count``. It was rejected because the reason is a decision a router
+    ``verdicts`` and ``drafts``. It was rejected because the reason is a decision a router
     already made, and reconstructing it is both a second copy of the routing rules and a trap:
     ``thresholds.passes()`` returns ``False`` for a non-case-report too, so a mis-ordered chain
     of conditions would file every ``NOT_CASE`` as ``LOW_SCORE``, and ``HIT_MAX_REFINES`` would

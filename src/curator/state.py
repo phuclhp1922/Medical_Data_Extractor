@@ -112,12 +112,12 @@ class CaseState(TypedDict):
     grading: Grading
 
     # --- the refine loop: two reducer channels (D22) ---
-    #     extract_case appends a Draft; review_case appends an EditorVerdict, and owns
-    #     refine_count (T5: max_refines = 3 means four extract passes).
+    #     extract_case appends a Draft; review_case appends an EditorVerdict. There is no
+    #     refine_count: how many passes have happened IS len(verdicts), and a stored copy of a
+    #     list's length is a second record that can disagree with the list (D27). max_refines = 3
+    #     still means four extract passes, counted where the cap is enforced.
     verdicts: Annotated[list[EditorVerdict], operator.add]
     drafts: Annotated[list[Draft], operator.add]
-
-    refine_count: int  # how many times the case has been through the refine loop
 
     # --- written by finalize, and only by finalize ---
     terminal_state: TerminalState  # why the case left the graph

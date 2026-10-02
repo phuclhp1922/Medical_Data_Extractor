@@ -18,7 +18,7 @@ Three properties are worth stating, because each is a bug the notebook had:
 - **Routers choose; they never write.** LangGraph forbids a router returning state, and the
   design leans on that: the reason a run ended is carried by *which* terminal node the router
   picked, not by a field some earlier node guessed at (D24, and ``nodes.finalize``).
-- **The loop is bounded.** ``review_route`` compares ``refine_count`` with ``max_refines``
+- **The loop is bounded.** ``review_route`` compares ``len(verdicts)`` with ``max_refines``
   before sending a case back to ``extract_case``, so a case that never satisfies the editor
   leaves through ``finalize_hit_max_refines`` rather than spending money until something breaks.
 
@@ -73,11 +73,18 @@ def review_route(state: CaseState, runtime) -> str:
     whether the editor is raising the same concern each time or moving the goalposts (D22's
     second question), and what the record should say about exhaustion.
 
+    The pass count is read here rather than stored: ``len(verdicts)`` is how many reviews have
+    happened, so there is no counter to fall behind the list it summarises (D27). Note the
+    arithmetic, because this is where the old ``refine_count`` hid an off-by-one: the first
+    extract is not a *refine*, so the refines already done is one fewer than the verdicts in
+    hand, and ``max_refines = 3`` therefore permits four extract passes -- what
+    ``.env.example`` has always claimed it means.
+
     "Satisfactory" is computed here rather than stored: an empty ``concerns`` list is the only
     spelling of a clean draft (``EditorVerdict``), so there is nothing to disagree with.
 
     Args:
-        state (CaseState): Needs ``verdicts`` and ``refine_count``.
+        state (CaseState): Needs ``verdicts``.
         runtime: Supplies ``max_refines``.
 
     Returns:
@@ -85,7 +92,8 @@ def review_route(state: CaseState, runtime) -> str:
     """
     if not state["verdicts"][-1].concerns:
         return TERMINALS[TerminalState.PASSED]
-    if state["refine_count"] >= runtime.context.max_refines:
+    refines_done = len(state["verdicts"]) - 1
+    if refines_done >= runtime.context.max_refines:
         return TERMINALS[TerminalState.HIT_MAX_REFINES]
     return EXTRACT_CASE
 

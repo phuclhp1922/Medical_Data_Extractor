@@ -1,7 +1,12 @@
 """Runtime configuration.
 
-A typed object rather than module-level constants, so Phase 2 can sweep judge model and
-grader thresholds without editing code. Imports nothing but the standard library: everything
+A typed object rather than module-level constants, so Phase 2 can sweep judge model and grader
+thresholds **without editing the pipeline**. Not every field is reachable from the environment,
+and the thresholds deliberately are not: a sweep builds its configurations in Python --
+``dataclasses.replace(base, thresholds=GradeThresholds(transparency_score=4))`` -- which puts the
+exact object into the ``Configuration`` that T7 snapshots per case. Six threshold variables would
+instead leave the settings that produced a result in a shell history. Imports nothing but the
+standard library: everything
 in the package depends on this module, which is what obliges it to stay cheap. In particular
 it must never import ``openai`` -- it holds model *ids*, which are strings.
 
@@ -14,7 +19,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from curator.schemas import Grading
@@ -29,6 +34,7 @@ JUDGE_MODEL_ENV = "JUDGE_MODEL"
 TEMPERATURE_ENV = "CURATOR_TEMPERATURE"
 JUDGE_TEMPERATURE_ENV = "JUDGE_TEMPERATURE"
 MAX_REFINES_ENV = "CURATOR_MAX_REFINES"
+IMAGE_DETAIL_ENV = "CURATOR_IMAGE_DETAIL"
 JUDGE_BASE_URL_ENV = "JUDGE_BASE_URL"
 PAUSE_SECONDS_ENV = "CURATOR_PAUSE_SECONDS"
 REQUEST_RETRIES_ENV = "CURATOR_REQUEST_RETRIES"
@@ -55,6 +61,12 @@ NO_TEMPERATURE = "none"
 # extraction is far higher than anything chosen here.
 DEFAULT_JUDGE_TEMPERATURE = DEFAULT_TEMPERATURE
 DEFAULT_MAX_REFINES = 3
+# How much fidelity the provider spends on each image. `low` is markedly cheaper per image and is
+# the largest cost lever in a full run: a figure is sent on every extract and every review, so one
+# case at max_refines=3 can send each image eight times. Default unchanged from what the first
+# live run used, so turning it down stays a measured decision.
+IMAGE_DETAIL_CHOICES = ("auto", "low", "high")
+DEFAULT_IMAGE_DETAIL = "auto"
 DEFAULT_PAUSE_SECONDS = 5.0
 DEFAULT_REQUEST_RETRIES = 2
 
@@ -90,6 +102,29 @@ def _temperature(env: Mapping[str, str], name: str, default: float) -> float | N
     """
     raw = _get(env, name, str(default))
     return None if raw.lower() == NO_TEMPERATURE else float(raw)
+
+
+def _image_detail(env: Mapping[str, str]) -> Literal["auto", "low", "high"]:
+    """Read the image-fidelity hint, rejecting anything the API would not understand.
+
+    Validated here rather than passed through, because a typo would otherwise travel all the way
+    to a 400 from the provider -- mid-run, after money has been spent on the calls before it.
+
+    Args:
+        env (Mapping[str, str]): The environment mapping to read from.
+
+    Returns:
+        Literal["auto", "low", "high"]: The hint.
+
+    Raises:
+        ValueError: The value is not one of the three the API accepts.
+    """
+    value = _get(env, IMAGE_DETAIL_ENV, DEFAULT_IMAGE_DETAIL).lower()
+    if value not in IMAGE_DETAIL_CHOICES:
+        raise ValueError(
+            f"{IMAGE_DETAIL_ENV}={value!r} is not one of {list(IMAGE_DETAIL_CHOICES)}"
+        )
+    return value  # type: ignore[return-value]
 
 
 def corpus_dir_from_env(env: Mapping[str, str] | None = None) -> Path:
@@ -156,6 +191,8 @@ class Configuration:
     temperature: float | None
     #: The editor's own, because it is a different model with different rules.
     judge_temperature: float | None
+    #: Image fidelity hint sent with every figure: ``"auto"``, ``"low"`` or ``"high"``.
+    image_detail: Literal["auto", "low", "high"]
     max_refines: int
     corpus_dir: Path
     thresholds: GradeThresholds
@@ -187,6 +224,7 @@ class Configuration:
                 env, JUDGE_TEMPERATURE_ENV, DEFAULT_JUDGE_TEMPERATURE
             ),
             max_refines=int(_get(env, MAX_REFINES_ENV, str(DEFAULT_MAX_REFINES))),
+            image_detail=_image_detail(env),
             corpus_dir=corpus_dir_from_env(env),
             thresholds=GradeThresholds(),
             pause_seconds=float(_get(env, PAUSE_SECONDS_ENV, str(DEFAULT_PAUSE_SECONDS))),

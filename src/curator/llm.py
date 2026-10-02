@@ -130,12 +130,19 @@ def _client(api_key_env: str, request_retries: int, base_url: str | None = None)
         OpenAI: The client.
 
     Raises:
-        KeyError: The variable is unset. Loud on purpose: a missing key is a setup fault, and
-            every alternative here is a default that turns it into an auth error later.
+        KeyError: The variable is unset **or empty**. Loud on purpose: a missing key is a setup
+            fault, and every alternative here is a default that turns it into an auth error
+            later. Empty counts as missing because that is the *likely* case, not the exotic
+            one -- ``.env.example`` ships ``JUDGE_API_KEY=`` with nothing after it, so a copied
+            file gives an empty string rather than an absent variable. Without this check the
+            two spellings raise different exceptions (``KeyError`` and the SDK's
+            ``OpenAIError``), which is one setup fault wearing two faces.
     """
-    return OpenAI(
-        api_key=os.environ[api_key_env], max_retries=request_retries, base_url=base_url
-    )
+    api_key = os.environ[api_key_env].strip()
+    if not api_key:
+        raise KeyError(f"{api_key_env} is set but empty")
+
+    return OpenAI(api_key=api_key, max_retries=request_retries, base_url=base_url)
 
 
 # --------------------------------------------------------------------------------------

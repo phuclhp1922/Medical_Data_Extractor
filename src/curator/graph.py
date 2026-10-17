@@ -2,7 +2,8 @@
 
 One case, one run. The shape is a straight line with one loop in it::
 
-    START -> load_case -> grade_case -.grade_route.-> finalize_low_score  -> END
+    START -> load_case -> grade_case -.grade_route.-> finalize_not_case   -> END
+                                       \\-> finalize_low_score  -> END
                                        \\-> extract_case -> review_case
                                                               |
                                           .review_route.-> extract_case (again)
@@ -44,13 +45,15 @@ TERMINALS = {reason: f"finalize_{reason.value}" for reason in TerminalState}
 
 
 def grade_route(state: CaseState, runtime) -> str:
-    """Decide what happens to a graded case.
+    """Decide what happens to a graded case: not a case report, too weak to use, or extract.
 
-    **Minimal stub -- T6 completes it.** Today a case that fails the thresholds leaves as
-    ``LOW_SCORE``, whatever the reason. That is wrong for one case in particular: a document the
-    grader says is not a case report at all is not a low-scoring case report, and
-    ``GradeThresholds.passes`` returns ``False`` for both, which is the confusion T6 exists to
-    undo (PLAN 2.4). ``TerminalState.NOT_CASE`` is already declared and has no writer yet.
+    **``is_case_report`` is checked first, before any score.** A document the grader says is not
+    a case report at all -- a chapter introduction, say -- is not a low-scoring case report, and
+    the two are counted separately in the funnel (PLAN 2.4, T6). Its four scores are undefined
+    (``Grading``'s docstring): strict mode makes the grader emit numbers anyway, so they must not
+    decide anything. ``GradeThresholds.passes`` also returns ``False`` for a non-case-report, so
+    the order is not what keeps such a document away from the extractor today. Checking first
+    means this router does not depend on that guard staying in ``passes``.
 
     Args:
         state (CaseState): Needs ``grading``.
@@ -59,6 +62,8 @@ def grade_route(state: CaseState, runtime) -> str:
     Returns:
         str: The name of the next node.
     """
+    if not state["grading"].is_case_report:
+        return TERMINALS[TerminalState.NOT_CASE]
     if runtime.context.thresholds.passes(state["grading"]):
         return EXTRACT_CASE
     return TERMINALS[TerminalState.LOW_SCORE]

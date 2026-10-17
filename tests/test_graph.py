@@ -247,6 +247,16 @@ def test_zero_refines_means_one_attempt():
     route = route_review([concerned()], max_refines=0)
     assert route == TERMINALS[TerminalState.HIT_MAX_REFINES]
 
+def test_not_a_case_report_is_not_low_score():
+    """A grading that says the document is not a case report ends as NOT_CASE, not LOW_SCORE.
+
+    T6 exists to make this distinction, and the router has to implement it. The test is that
+    ``route_grade`` returns the right terminal for a grading with
+    ``is_case_report=False``.
+    """
+    route = route_grade(grading(score=5, is_case_report=False))
+    assert route == TERMINALS[TerminalState.NOT_CASE]
+
 # --------------------------------------------------------------------------------------
 # The grade router  [yours] -- use route_grade(...)
 # --------------------------------------------------------------------------------------
@@ -331,7 +341,18 @@ def test_a_low_scoring_case_costs_one_call(run_case):
     # The grader was called, but nothing else.
     assert model.roles == [Role.GRADER]
 
-# One more, with no stub: T6's gap. Today a grading with ``is_case_report=False`` ends as
-# ``low_score``, and ``TerminalState.NOT_CASE`` has no writer. Whether to write a test that pins
-# today's behaviour, or to leave it until T6 changes it, is your call -- a test that asserts a
-# known-wrong outcome has to be rewritten the day the bug is fixed.
+
+def test_a_case_that_is_not_a_case_report_costs_one_call(run_case):
+    """A case that fails grading as not a case report stops there.
+
+    ``model.roles`` shows what was and was not called.
+    """
+    model = FakeModel(grading=grading(score=5, is_case_report=False))
+    run = run_case(model, max_refines=3)
+
+    assert run["terminal_state"] == TerminalState.NOT_CASE
+    assert len(run["drafts"]) == 0
+    assert len(run["verdicts"]) == 0
+    assert run["grading"] is not None
+    # The grader was called, but nothing else.
+    assert model.roles == [Role.GRADER]

@@ -120,7 +120,13 @@ def build_graph():
     builder.add_edge(START, LOAD_CASE)
     builder.add_edge(LOAD_CASE, GRADE_CASE)
     builder.add_conditional_edges(
-        GRADE_CASE, grade_route, [EXTRACT_CASE, TERMINALS[TerminalState.LOW_SCORE]]
+        GRADE_CASE,
+        grade_route,
+        [
+            EXTRACT_CASE,
+            TERMINALS[TerminalState.LOW_SCORE],
+            TERMINALS[TerminalState.NOT_CASE],
+        ],
     )
     builder.add_edge(EXTRACT_CASE, REVIEW_CASE)
     builder.add_conditional_edges(

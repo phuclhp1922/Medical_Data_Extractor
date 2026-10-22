@@ -48,7 +48,7 @@ _CHECKLIST = """
         - All facts from the case prompt are present in the source article.
         - Contains only information known before the clinicians formed a differential.
         - Images included must relate closely to the case prompt
-        - Does not reveal the final diagnosis (there should be room for at least some inference).
+        - Does not reveal the final diagnosis (there should be room for at least some inference). However, the setting (outbreak, travel, exposure), if it is known when receive the patient, can be included, without naming the disease or the doctor's conclusion.
         - Provides sufficient data (HPI, vitals, exam ± initial tests) for clinicians to formulate a reasonable differential and get the correct final diagnosis.
       C. Diagnostic Reasoning Section
         - Each numbered entry starts with a summary of the reasoning plus a direct quote from the article.

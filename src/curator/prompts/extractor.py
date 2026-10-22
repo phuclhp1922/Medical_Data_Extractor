@@ -60,11 +60,10 @@ RULES = """
     • Perserve the lab and examination results.
     • Include images' names that related closely with the case, within the text right after the fact ( for example, this patient has some X-ray (Fig 100.100) ). Ensure that those images are necessary for the case prompt.
     • Present the case in the order presented in the case report (e.g., physical labs before imaging, etc.).
-    • Omit any wording that directly states or hints at the final diagnosis.
+    • Omit any wording that directly states or hints at the final diagnosis or the doctor's conclusion, except the setting (outbreak, travel, exposure) known when receive the patient, without naming the disease or the doctor's conclusion.
     • Present this as closely as possible to the style in which the case report is written.
     • Omit repeating details.
-    • Omit the answer to the question “What is the final diagnosis?”
-    • Include only one question. Do not include answer.
+    • Include only one question asking about the final diagnosis. Do not include answer.
     • Put everything into a paragraph.
 
     7. What Goes Inside reasoning_points

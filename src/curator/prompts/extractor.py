@@ -36,26 +36,26 @@ RULES = """
     2. Structure the Teaching Case
     Case Presentation → Additional Infos → Question-Answer pairs → Follow-up → Disease summary and remarks
 
-    3. Use the XML Tags Exactly as Shown
-    • <think> . . . </think> - your hidden analytic notes (not visible to students).
-    • <image_finding> . . . </image_finding> - your judgment about the meaning and content of the image and the helpfulness of the image.
-    • <case_prompt> . . . </case_prompt> - the information given to students before they generate a differential.
-    • <reasoning_points> . . . </reasoning_points> - numbered bullet reasons, each built as a full sentence followed by a direct quote.
-    • <reasoning_narrative> . . . </reasoning_narrative> - the continuous narrative of the reasoning points.
-    • <final_diagnosis> . . . </final_diagnosis> - single disease/entity name only, nothing more.
+    3. What each part is about
+    • think: your hidden analytic notes (not visible to students).
+    • image_finding: your judgment about the meaning and content of the image and the helpfulness of the image.
+    • case_prompt: the information given to students before they generate a differential.
+    • reasoning_points: numbered bullet reasons, each built as a full sentence followed by a direct quote.
+    • reasoning_narrative: the continuous narrative of the reasoning points.
+    • final_diagnosis: single disease/entity name only, nothing more.
 
-    4. What Goes Inside <think>
+    4. What Goes Inside think
     • Key points - What makes this case non-trivial or pedagogically interesting? This should guide where the breakpoint should be.
     • Ideal breakpoint - What details of the case presentation should you include and exclude so that students have enough data to reason, but
     no spoilers?
     • Author's analytic distinctions - How did they reach and separate the final diagnosis from look-alikes and other conditions?
 
-    5. What Goes Inside <image_finding>
+    5. What Goes Inside image_finding
     • Description - What the image shows or displays
     • Helpfulness - How the image helps or supports the doctor in understanding the case.
     • Relevance - How relevant the image is to the patient.
 
-    6. What Goes Inside <case_prompt>
+    6. What Goes Inside case_prompt
     • Present only the facts known when recieve the patient and before a working differential was made: chief complaint, HPI, vitals, physical exam, and early investigations. No future updates or follow-up.
     • Perserve the lab and examination results.
     • Include images' names that related closely with the case, within the text right after the fact ( for example, this patient has some X-ray (Fig 100.100) ). Ensure that those images are necessary for the case prompt.
@@ -67,7 +67,7 @@ RULES = """
     • Include only one question. Do not include answer.
     • Put everything into a paragraph.
 
-    7. What Goes Inside <reasoning_points>
+    7. What Goes Inside reasoning_points
     • Numbered list (1., 2., 3., . . . ).
     • Discuss only about the final diagnosis, not any other findings.
     • Each entry: concise summary of reason [“direct quote from article”]. You can use ellipses (. . . ) to shorten the quote if there are irrelevant details.
@@ -75,23 +75,22 @@ RULES = """
     • The steps to reach the final diagnosis from the case prompt.
     • Discuss and explain the steps to reach the final diagnosis from the case prompt.
 
-    8. What Goes Inside <reasoning_narrative>
+    8. What Goes Inside reasoning_narrative
     • Stitching the reasoning points into a continous narrative.
     • Structure: Diagnostic steps -> Image grounding.
 
-    9. What Goes Inside <final_diagnosis>
+    9. What Goes Inside final_diagnosis
     • Single disease/entity name (e.g., sarcoidosis).
     • No adjectives, punctuation, or explanatory text.
     • Answer the case prompt.
 
-    OUTPUT TEMPLATE (copy exactly, especially the tag)
-    <think>
+    OUTPUT TEMPLATE (what each field should look like, the field names come from the response format, and no tags should be written.)
+    think
     1. [Core tension]
     2. [Best breakpoint of case report, what to include and what to exclude]
     3. [Key analytic distinctions between competing diagnoses (taken from case report)]
-    </think>
 
-    <image_finding>
+    image_finding
     1. image_1
     Description: ...
     Helpfulness: ...
@@ -103,27 +102,22 @@ RULES = """
     Relevance: ...
 
     3. ...
-    </image_finding>
 
-    <case_prompt>
+    case_prompt
     [Your case presentation text, faithful to the report and stopping at the breakpoint]
-    </case_prompt>
 
-    <reasoning_points>
+    reasoning_points
     1. reasoning_point_1 | Direct quote from article: "..." | Grounded in image if possible: ...
 
     2. reasoning_point_2 | Direct quote from article: "..." | Grounded in image if possible: ...
 
     3. ...
-    </reasoning_points>
 
-    <reasoning_narrative>
+    reasoning_narrative
     ReasoningNarrative
-    </reasoning_narrative>
 
-    <final_diagnosis>
+    final_diagnosis
     DiseaseName
-    </final_diagnosis>
   """
 
 #: Fingerprint of the shared spec alone -- the text both passes obey.

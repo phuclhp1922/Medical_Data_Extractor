@@ -29,6 +29,7 @@ ids and numbers, and T7 snapshots it into every run record; a key in it would wr
 
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, TypeVar
@@ -37,7 +38,7 @@ from openai import OpenAI
 from openai.types.responses import ResponseInputParam
 from pydantic import BaseModel
 
-from curator.parsing import parse_structured
+from curator.parsing import CallUsage, parse_structured
 from curator.schemas import Role
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -187,6 +188,7 @@ class LLM:
         input: str | ResponseInputParam,
         case_id: str,
         role: Role,
+        on_usage: Callable[[CallUsage], None] | None = None,
         **options: Any,
     ) -> ModelT:
         """Wait for this key's turn, then ask for an answer shaped like ``schema``.
@@ -199,6 +201,9 @@ class LLM:
             input (str | ResponseInputParam): The prompt, as text or as content parts.
             case_id (str): The case directory name, recorded on any error raised.
             role (Role): Which role is calling, recorded on any error raised.
+            on_usage (Callable[[CallUsage], None] | None): Receives the call's token counts.
+                Named here rather than left in ``options`` so it can never be sent to the API
+                as a request parameter. See ``parse_structured``.
             **options (Any): Passed through to the request unchanged -- ``max_output_tokens``
                 and so on. Not ``temperature``: that belongs to the ``LLM``, and passing it
                 here as well raises ``TypeError`` rather than silently picking one.
@@ -223,6 +228,7 @@ class LLM:
                 input=input,
                 case_id=case_id,
                 role=role,
+                on_usage=on_usage,
                 **sampling,
                 **options,
             )

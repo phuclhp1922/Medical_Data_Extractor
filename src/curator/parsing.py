@@ -31,6 +31,7 @@ Transport failures -- rate limits, auth, timeouts -- are **not** mapped. The SDK
 decision, not this module's.
 """
 
+from collections.abc import Callable
 from typing import Any, TypeVar
 
 from openai import OpenAI
@@ -42,6 +43,60 @@ from curator.schemas import RefusalError, Role, SchemaError, StoppedBy, Truncati
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
+class CallUsage(BaseModel):
+    """What one model call cost, as the provider reported it (T7, D29).
+
+    Every count is ``int | None``, and ``None`` means *the provider did not say* -- not zero. A
+    judge on another vendor's endpoint may report no cached or reasoning tokens at all, and a
+    record that turned that silence into ``0`` would understate the cost it exists to record.
+
+    Attributes:
+        role (Role): Which role made the call.
+        model (str): The model id the call was sent to.
+        input_tokens (int | None): Prompt tokens, images included.
+        cached_input_tokens (int | None): The part of ``input_tokens`` served from the
+            provider's prompt cache -- billed cheaper, which is why it is kept apart.
+        output_tokens (int | None): Tokens generated, reasoning included.
+        reasoning_tokens (int | None): The part of ``output_tokens`` spent reasoning before the
+            answer. Billed as output, never shown.
+    """
+
+    role: Role
+    model: str
+    input_tokens: int | None
+    cached_input_tokens: int | None
+    output_tokens: int | None
+    reasoning_tokens: int | None
+
+
+def usage_from_body(body: dict[str, Any], *, role: Role, model: str) -> CallUsage:
+    """Read a response body's ``usage`` block into a ``CallUsage``.
+
+    Read with ``.get`` throughout, unlike ``interpret_response``. Usage is bookkeeping, not part
+    of the curation contract: a body without it is still a valid answer, and a call must not
+    fail because the provider left its token counts out.
+
+    Args:
+        body (dict[str, Any]): The response JSON.
+        role (Role): Which role made the call.
+        model (str): The model id the call was sent to.
+
+    Returns:
+        CallUsage: The counts, with ``None`` for anything the body did not report.
+    """
+    usage = body.get("usage") or {}
+    input_details = usage.get("input_tokens_details") or {}
+    output_details = usage.get("output_tokens_details") or {}
+    return CallUsage(
+        role=role,
+        model=model,
+        input_tokens=usage.get("input_tokens"),
+        cached_input_tokens=input_details.get("cached_tokens"),
+        output_tokens=usage.get("output_tokens"),
+        reasoning_tokens=output_details.get("reasoning_tokens"),
+    )
+
+
 def parse_structured(
     client: OpenAI,
     *,
@@ -50,6 +105,7 @@ def parse_structured(
     input: str | ResponseInputParam,
     case_id: str,
     role: Role,
+    on_usage: Callable[[CallUsage], None] | None = None,
     **options: Any,
 ) -> ModelT:
     """Ask ``model`` for an answer shaped like ``schema``, and return it or raise why not.
@@ -63,6 +119,10 @@ def parse_structured(
         input: The prompt, as a string or a list of input items (text and images).
         case_id: The case directory name, recorded on any error raised.
         role: Which role is calling, recorded on any error raised.
+        on_usage: Called with the call's token counts, if given. A callback rather than a
+            second return value so the return type stays the answer alone, and every existing
+            caller and test is untouched. Called *before* the answer is interpreted, so a call
+            that then raises a typed error has still reported what it cost.
         **options: Passed through to the request unchanged -- ``temperature``,
             ``max_output_tokens`` and so on.
 
@@ -78,7 +138,10 @@ def parse_structured(
     raw = client.responses.with_raw_response.parse(
         text_format=schema, model=model, input=input, **options
     )
-    return interpret_response(raw.http_response.json(), schema=schema, case_id=case_id, role=role)
+    body = raw.http_response.json()
+    if on_usage is not None:
+        on_usage(usage_from_body(body, role=role, model=model))
+    return interpret_response(body, schema=schema, case_id=case_id, role=role)
 
 
 def interpret_response(

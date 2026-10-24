@@ -38,6 +38,7 @@ from curator.graph import (  # noqa: F401
     review_route,
 )
 from curator.llm import LLM
+from curator.parsing import CallUsage
 from curator.schemas import (
     ChecklistSection,
     Concern,
@@ -50,6 +51,9 @@ from curator.state import TerminalState  # noqa: F401
 
 #: Placeholder for the case text. Never real corpus text: the source is copyrighted.
 SOURCE_TEXT = "ZZQQ_CASE_SENTINEL"
+
+#: Input and output tokens the fake model reports for every call it answers.
+FAKE_TOKENS = 100
 
 
 # --------------------------------------------------------------------------------------
@@ -197,7 +201,20 @@ def run_case(monkeypatch):
     monkeypatch.setattr(graph_module, "load_case", fake_load_case)
 
     def _run(model: FakeModel, **overrides) -> dict:
-        def fake_parse(llm, schema, *, input, case_id, role, **options):
+        def fake_parse(llm, schema, *, input, case_id, role, on_usage=None, **options):
+            # Report a fixed token count per call, the way a real call does, so a run's
+            # ``usage`` list has one entry per call that succeeded.
+            if on_usage is not None:
+                on_usage(
+                    CallUsage(
+                        role=role,
+                        model=llm.model,
+                        input_tokens=FAKE_TOKENS,
+                        cached_input_tokens=0,
+                        output_tokens=FAKE_TOKENS,
+                        reasoning_tokens=0,
+                    )
+                )
             return model.answer(schema, role)
 
         monkeypatch.setattr(LLM, "parse", fake_parse)

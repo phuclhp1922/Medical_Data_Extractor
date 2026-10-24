@@ -36,6 +36,7 @@ from enum import StrEnum
 from typing import Annotated, TypedDict
 
 from curator.figures import Figure
+from curator.parsing import CallUsage
 from curator.schemas import Draft, EditorVerdict, Grading
 
 # --------------------------------------------------------------------------------------
@@ -118,6 +119,11 @@ class CaseState(TypedDict):
     #     still means four extract passes, counted where the cap is enforced.
     verdicts: Annotated[list[EditorVerdict], operator.add]
     drafts: Annotated[list[Draft], operator.add]
+
+    # --- written by every node that calls a model: one entry per successful call (D29) ---
+    #     A reducer channel for the same reason as the two above: three nodes write it, and each
+    #     call is a fact to keep, not a value to replace. Order is call order.
+    usage: Annotated[list[CallUsage], operator.add]
 
     # --- written by finalize, and only by finalize ---
     terminal_state: TerminalState  # why the case left the graph

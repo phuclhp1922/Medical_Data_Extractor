@@ -32,6 +32,7 @@ from curator.config import Configuration
 from curator.figures import CorpusError, Figure, resolve_case
 from curator.images import as_content_parts
 from curator.llm import JUDGE_API_KEY_ENV, LLM
+from curator.parsing import CallUsage
 from curator.prompts import editor, extractor, grader
 from curator.schemas import Draft, EditorVerdict, Grading, Role
 from curator.state import CaseState, TerminalState
@@ -147,9 +148,10 @@ def grade_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
         runtime (Runtime[Configuration]): Supplies the model id, pacing and retry policy.
 
     Returns:
-        dict: ``grading`` alone. A case that is not a case report is still only a grading
-        here: acting on ``is_case_report`` is ``grade_route``'s job, and ``terminal_state`` is
-        written by ``finalize`` and nothing else.
+        dict: ``grading``, and the call's token counts appended to ``usage`` (D29). A case
+        that is not a case report is still only a grading here: acting on ``is_case_report``
+        is ``grade_route``'s job, and ``terminal_state`` is written by ``finalize`` and
+        nothing else.
 
     Raises:
         RefusalError: The grader refused, or a content filter stopped the output.
@@ -162,6 +164,7 @@ def grade_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
         request_retries=runtime.context.request_retries,
         temperature=runtime.context.temperature,
     )
+    usage: list[CallUsage] = []
     grading = llm.parse(
         Grading,
         input=_user_message(
@@ -171,9 +174,10 @@ def grade_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
         ),
         case_id=state["source"],
         role=Role.GRADER,
+        on_usage=usage.append,
     )
 
-    return {"grading": grading}
+    return {"grading": grading, "usage": usage}
 
 
 def _editor_findings(verdict: EditorVerdict) -> tuple[str, str]:
@@ -218,10 +222,11 @@ def extract_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
         runtime (Runtime[Configuration]): Supplies the model id, sampling and retry policy.
 
     Returns:
-        dict: The new ``draft`` appended to ``drafts`` -- and nothing else. No pass counter: how
-        many passes have happened is ``len(verdicts)``, read where the cap is enforced (D27). A
-        stored count would be a second record of a list's length, free to disagree with it, and
-        T5's cap is only meaningful if the number it compares is the true one.
+        dict: The new ``draft`` appended to ``drafts``, and the call's token counts to
+        ``usage`` (D29) -- nothing else. No pass counter: how many passes have happened is
+        ``len(verdicts)``, read where the cap is enforced (D27). A stored count would be a
+        second record of a list's length, free to disagree with it, and T5's cap is only
+        meaningful if the number it compares is the true one.
 
     Raises:
         RefusalError: The extractor refused, or a content filter stopped the output.
@@ -252,14 +257,16 @@ def extract_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
         temperature=runtime.context.temperature,
     )
 
+    usage: list[CallUsage] = []
     draft = llm.parse(
         Draft,
         input=_user_message(prompt, state["figures"], runtime.context.image_detail),
         case_id=state["source"],
         role=Role.EXTRACTOR,
+        on_usage=usage.append,
     )
 
-    return {"drafts": [draft]}
+    return {"drafts": [draft], "usage": usage}
 
 
 def review_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
@@ -284,9 +291,10 @@ def review_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
         runtime (Runtime[Configuration]): Supplies the judge's model, endpoint and policy.
 
     Returns:
-        dict: The new verdict appended to ``verdicts`` -- and nothing else. That list is the
-        pipeline's record of how many review passes happened, which is why ``extract_case``
-        reads its length instead of keeping a counter of its own.
+        dict: The new verdict appended to ``verdicts``, and the call's token counts to
+        ``usage`` (D29) -- nothing else. That list is the pipeline's record of how many review
+        passes happened, which is why ``extract_case`` reads its length instead of keeping a
+        counter of its own.
 
     Raises:
         RefusalError: The editor refused, or a content filter stopped the output.
@@ -304,6 +312,7 @@ def review_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
         base_url=runtime.context.judge_base_url,
     )
 
+    usage: list[CallUsage] = []
     verdict = llm.parse(
         EditorVerdict,
         input=_user_message(
@@ -321,9 +330,10 @@ def review_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
         ),
         case_id=state["source"],
         role=Role.EDITOR,
+        on_usage=usage.append,
     )
 
-    return {"verdicts": [verdict]}
+    return {"verdicts": [verdict], "usage": usage}
 
 
 def finalize(reason: TerminalState) -> Callable[[CaseState, Runtime[Configuration]], dict]:

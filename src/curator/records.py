@@ -49,6 +49,10 @@ DEFAULT_RUNS_DIR = Path("runs")
 #: The batch's own description, written once when the batch folder is created.
 MANIFEST_NAME = "batch.json"
 
+#: Subfolder of a batch holding one file per explicit addition of cases. A subfolder, so the
+#: ``*.json`` that ``load_batch`` and ``finished_sources`` read stays records only.
+ADDITIONS_DIR = "additions"
+
 #: Configuration fields that change how fast a batch runs but not what it produces. A resumed
 #: batch may differ in these; in anything else it may not (see ``check_manifest``).
 _OPERATIONAL_FIELDS = ("pause_seconds", "request_retries")
@@ -277,9 +281,11 @@ def write_manifest(
 ) -> Path:
     """Create a batch folder and describe the batch in ``batch.json``.
 
-    The list of sources is fixed here, at creation. It is the batch's population: what a resume
-    runs, and the denominator a funnel is read against. Letting a resume choose its own cases
-    would let a ten-case batch grow into a ninety-three-case one without anyone deciding to.
+    The list of sources written here is the batch's starting population: what a resume runs,
+    and the denominator a funnel is read against. It grows only through ``add_sources``, when
+    cases are named explicitly -- a resume with no cases never grows it, so a ten-case batch
+    cannot become a ninety-three-case one without anyone deciding to. This file is never edited;
+    additions are separate files beside it.
 
     Args:
         batch_dir (Path): The folder to create. Must not exist yet.
@@ -309,6 +315,52 @@ def write_manifest(
 def read_manifest(batch_dir: Path) -> dict[str, Any]:
     """The batch's ``batch.json``, as written by ``write_manifest``."""
     return json.loads((batch_dir / MANIFEST_NAME).read_text(encoding="utf-8"))
+
+
+def batch_sources(batch_dir: Path) -> list[str]:
+    """Every source the batch is for: the manifest's, then each addition's, in the order added.
+
+    This, not ``read_manifest(...)["sources"]``, is the batch's population once anything has
+    been added to it.
+    """
+    sources = list(read_manifest(batch_dir)["sources"])
+    additions = batch_dir / ADDITIONS_DIR
+    if additions.is_dir():
+        for path in sorted(additions.glob("*.json")):
+            for source in json.loads(path.read_text(encoding="utf-8"))["sources"]:
+                if source not in sources:
+                    sources.append(source)
+    return sources
+
+
+def add_sources(batch_dir: Path, sources: list[str], *, added_at: datetime) -> list[str]:
+    """Add cases to an existing batch, on purpose (D29 amendment).
+
+    Writes ``additions/<UTC time>.json`` listing the sources that are new to the batch -- the
+    manifest itself is never edited, so the batch keeps a record of when each case joined.
+    Sources already in the batch are left alone. The caller must have checked the settings
+    first (``check_manifest``): an addition is still the same experiment, or it is refused.
+
+    Args:
+        batch_dir (Path): An existing batch folder.
+        sources (list[str]): Case directory names to add.
+        added_at (datetime): When, timezone-aware.
+
+    Returns:
+        list[str]: The sources that were actually new, in order. Empty means nothing was
+        written.
+    """
+    current = set(batch_sources(batch_dir))
+    new = [source for source in dict.fromkeys(sources) if source not in current]
+    if new:
+        addition = {
+            "schema_version": RECORD_SCHEMA_VERSION,
+            "added_at": added_at.isoformat(),
+            "sources": new,
+            "git": _git_revision(),
+        }
+        _write_once(addition, batch_dir / ADDITIONS_DIR / f"{_stamp(added_at.isoformat())}.json")
+    return new
 
 
 def check_manifest(batch_dir: Path, cfg: Configuration) -> list[str]:

@@ -70,3 +70,5 @@ desktop.ini
 teaching/
 scratchboard/
 scripts/
+# Recorded API traffic (T8). Responses quote the copyrighted source; see D1 before committing any.
+tests/cassettes/

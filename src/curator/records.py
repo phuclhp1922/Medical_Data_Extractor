@@ -579,8 +579,8 @@ def format_record(record: Mapping[str, Any]) -> str:
     ]
 
     # Each extract pass is followed by exactly one review, so drafts[i] is the draft verdicts[i]
-    # judged. zip_longest rather than zip: a run that stopped between the two (a crash in the
-    # editor, once T7 records failed runs) shows its unreviewed last draft instead of hiding it.
+    # judged. zip_longest rather than zip: a finished run always has as many reviews as drafts,
+    # but a record that ever held one more draft would show it as unreviewed, not hide it.
     for number, (draft, verdict) in enumerate(zip_longest(drafts, verdicts), start=1):
         heading = f"PASS {number} OF {len(drafts)}"
         if number == len(drafts):

@@ -72,11 +72,11 @@ def grade_route(state: CaseState, runtime) -> str:
 def review_route(state: CaseState, runtime) -> str:
     """Decide whether the newest draft is done, needs another pass, or has run out of passes.
 
-    **Minimal stub -- T5 completes it.** The cap is here already, deliberately: without it a
-    case the editor never approves would loop until LangGraph's recursion limit stopped it, and
-    a live run would pay for every pass on the way. What T5 owns is the *meaning* of the loop --
-    whether the editor is raising the same concern each time or moving the goalposts (D22's
-    second question), and what the record should say about exhaustion.
+    **The cap is the only stop besides approval** (T5, PLAN 2.3). Without it a case the editor
+    never approves would loop until LangGraph's recursion limit stopped it, paying for every
+    pass on the way. Stopping *earlier* -- when a case cannot be fixed, rather than when it runs
+    out of passes -- is an open decision: the first ten cases showed that the obvious signals
+    would also have stopped cases that went on to pass (D29's postscripts, D28's second).
 
     The pass count is read here rather than stored: ``len(verdicts)`` is how many reviews have
     happened, so there is no counter to fall behind the list it summarises (D27). Note the

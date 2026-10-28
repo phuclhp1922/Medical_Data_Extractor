@@ -140,8 +140,9 @@ def grade_case(state: CaseState, runtime: Runtime[Configuration]) -> dict:
     **Nor does it catch the typed errors.** A refusal, a truncation or a schema failure ends
     the run loudly. The notebook turned a refusal into ``passed_grading: False`` -- a
     non-answer recorded as a judgement, and the third confound behind the 0-of-51 figure
-    (PLAN 2.6). Until there is a terminal state that means "we never got an answer", crashing
-    is the honest option: 93 cases is a cheap rerun, and a silent miscount is not.
+    (PLAN 2.6). So the node raises, and the batch runner (``curator.run``) catches it and writes
+    an *error record* for the case -- counted in the funnel's ``error`` bucket, never as an
+    outcome (D29). A silent miscount is the thing to avoid; a recorded error is not one.
 
     Args:
         state (CaseState): Needs ``source``, ``source_text`` and ``figures``.
@@ -352,8 +353,9 @@ def finalize(reason: TerminalState) -> Callable[[CaseState, Runtime[Configuratio
     come to mean "none of the other three matched". Same principle as ``EditorVerdict`` having
     no ``satisfactory`` field: keep the fact, do not derive it twice.
 
-    This is also where T7 will persist the run record, because it is the one point every case
-    reaches exactly once, whichever way it ends.
+    It writes state and nothing else. The run record is built *after* the graph returns, by
+    ``records.build_record`` (and by ``build_error_record`` when it raises instead), so a crash
+    anywhere -- including here -- still leaves a record.
 
     Args:
         reason (TerminalState): Why runs ending at this node ended.
@@ -367,12 +369,11 @@ def finalize(reason: TerminalState) -> Callable[[CaseState, Runtime[Configuratio
         """Record why this case left the graph.
 
         Args:
-            state (CaseState): Not read today. T7 will record it from here.
-            runtime (Runtime[Configuration]): Not read today.
+            state (CaseState): Not read; the reason is already in hand from the enclosing call.
+            runtime (Runtime[Configuration]): Not read.
 
         Returns:
-            dict: The update. Yours to write -- one key, and ``reason`` is already in hand from
-            the enclosing call, so nothing needs deciding here.
+            dict: The update -- ``terminal_state`` alone.
         """
         return {"terminal_state": reason}
 

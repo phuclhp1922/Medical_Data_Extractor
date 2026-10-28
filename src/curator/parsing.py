@@ -27,8 +27,9 @@ testable offline from a hand-written body. That split is the seam: ``parse_struc
 only line that touches the network, and it contains no decisions.
 
 Transport failures -- rate limits, auth, timeouts -- are **not** mapped. The SDK raises them as
-``openai.APIError`` subclasses; they say nothing about the case, and whether to retry them is T5's
-decision, not this module's.
+``openai.APIError`` subclasses; they say nothing about the case. The SDK retries them itself,
+``request_retries`` times (``llm.py``); one that survives propagates, and the batch runner records
+it as an error record (D29).
 """
 
 from collections.abc import Callable

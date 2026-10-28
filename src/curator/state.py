@@ -16,9 +16,9 @@ Validating them a second time on every node write would buy nothing.
 case data and run configuration.
 
 **Image bytes do not live here either.** State holds ``Figure`` objects -- label, path, caption
--- and ``images.py`` decodes them into content parts at call time. T7 serialises this whole
-object per case; base64 in a channel would write tens of megabytes of copyrighted figures into
-every run record.
+-- and ``images.py`` decodes them into content parts at call time. Run records are built from
+this state (``records.build_record``), which keeps each figure's label and file name; base64 in
+a channel would have put megabytes of copyrighted figures in reach of every record.
 
 A field's comment says which node writes it. That is the useful thing to know about a channel:
 two writers of one field is a design question, and ``terminal_state`` having exactly one is a

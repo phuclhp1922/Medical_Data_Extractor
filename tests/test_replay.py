@@ -153,7 +153,9 @@ def test_a_recorded_run_replays_offline(replay):
     recording holds -- ``replay.transport.unused`` -- no more (that would be a ``CassetteMiss``)
     and no fewer (the replay took a shorter path than the real run did).
     """
-    pytest.skip("yours")
+    out = replay.run()
+    assert out["terminal_state"] in TerminalState
+    assert replay.transport.unused == 0
 
 
 def test_the_replay_keeps_every_draft_review_and_call(replay):
@@ -162,7 +164,9 @@ def test_the_replay_keeps_every_draft_review_and_call(replay):
     Available in the final state: ``drafts``, ``verdicts`` and ``usage`` (one entry per call).
     Think about how the three lengths relate for a run that got past grading.
     """
-    pytest.skip("yours")
+    out = replay.run()
+    assert len(out["drafts"]) == len(out["verdicts"])
+    assert len(out["verdicts"]) + len(out["drafts"]) + 1 == len(out["usage"])
 
 
 def test_a_changed_prompt_misses_the_cassette(replay, monkeypatch):
@@ -175,8 +179,13 @@ def test_a_changed_prompt_misses_the_cassette(replay, monkeypatch):
     and raises its own ``openai.APIConnectionError``, with the original on ``__cause__``. Claim
     both.
     """
-    pytest.skip("yours")
-
+    original = grader_module.render
+    monkeypatch.setattr(
+        grader_module, "render", lambda *args, **kwargs: original(*args, **kwargs) + " "
+    )
+    with pytest.raises(openai.APIConnectionError) as excinfo:
+        replay.run()
+    assert isinstance(excinfo.value.__cause__, CassetteMiss)
 
 # --------------------------------------------------------------------------------------
 # Recording -- run by hand, never by pytest

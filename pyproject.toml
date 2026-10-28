@@ -15,8 +15,11 @@ license-files = ["LICENSE"]
 # DATASHEET.md, planned) - do not restate the dataset terms inside LICENSE itself.
 
 dependencies = [
-    "langgraph>=0.2",
-    "openai>=1.0",
+    # Bounded to the major versions the code was written and tested against. ">=0.2" spanned
+    # langgraph's 1.0 break (context_schema / Runtime); ">=1.0" let openai resolve to an older
+    # SDK -- the cassette transport (tests/cassette.py) is written against 3.x's httpx2 client.
+    "langgraph>=1.2,<2",
+    "openai>=3.3,<4",
     "pydantic>=2.7",
     "typer>=0.12",
     "pandas>=2.2",

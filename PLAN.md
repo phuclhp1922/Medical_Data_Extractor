@@ -1,7 +1,18 @@
-# Medical VLM Data Curator — Rebuild, Calibration & Study Plan
+# Medical VLM Data Curator — Rebuild & Study Plan
 
 > Working plan for turning `03_curation_loop_langgraph.ipynb` into a CV-grade project.
 > Budget: ~10 hrs/week × 4 weeks ≈ 40 hours.
+
+> **Direction change — 2026-10-27.** The project is now positioned as a **reimplementation of
+> MedCaseReasoning (Wu et al., 2025) with two extensions — figure resolution and the
+> editor → extractor retry loop — plus an analysis of what those extensions do.** Judge
+> calibration against human labels, previously the centrepiece, is deferred (see *Deferred —
+> Judge calibration* in §6). A doctor review is planned but not confirmed, and nothing depends
+> on it.
+>
+> **Status:** Phase 1 is complete (T1–T8, see `teaching/PHASE1_PORT.md`). Next is the frozen
+> run that Phase 2 starts from. §1–§5 describe the prototype as it was found and remain
+> accurate as history.
 
 ---
 
@@ -492,7 +503,10 @@ a genuine hiring signal, not an obstacle.
    0 disagreements — §3). You lose the external key, not the test. For the 24 figures with no
    parseable caption, hand-label from `_origin.pdf` / `_layout.pdf`, which are on local disk.
 
-### Phase 1 — Correctness fixes (week 2, ~10h)
+### Phase 1 — Correctness fixes (week 2, ~10h) — ✅ done
+**Complete as of 2026-10-27.** All six items landed as T1–T8 (`teaching/PHASE1_PORT.md`), with
+99 tests passing. Still open: two dependency pins, and committing T8's replay asserts.
+
 Fix in this order; each is independently verifiable:
 1. **Figure resolver** (§3) — highest impact, and testable with zero API calls.
 2. Editor empty-rubric → `RULES` + `render()` split.
@@ -502,7 +516,86 @@ Fix in this order; each is independently verifiable:
    keeping only `reasoning_points` / `reasoning_narrative` as free text).
 6. Persist **full** state per case, not six fields.
 
-### Phase 2 — Judge calibration (week 2–3, ~12h) ← the centrepiece
+### Phase 2 — The loop study ← the centrepiece
+
+**The question:** what does the editor → extractor retry loop actually do? Everything in this
+phase is measured from the pipeline's own records. **No human labels are needed.**
+
+**The rule that keeps it honest.** The only thing scoring the loop here is the loop's own
+editor. More retries will always raise the pass rate, because that is what retries are for.
+But "passed" means *the editor stopped complaining*, not *the case got better*. So every claim
+in this phase is about **how the loop behaves**, never about **output quality**. Quality needs
+a human, and that is Phase 3's optional doctor review.
+
+**0. Freeze one full run first.** Run all 93 cases once, keep every record, and never
+regenerate it. Every step below reads from this run. The models will drift, so results
+computed later against fresh output would describe a different system. The records already
+capture what's needed to describe the run: config, git sha, prompt versions, model ids and
+per-call usage.
+
+- **Prerequisite, met:** everything that changes prompts or routing had to land *before* the
+  freeze. The prompt fixes D26 and D28 + amendment landed on 2026-10-22 (`97dd3ed`,
+  `1139b79`), before the first installment ran on 2026-10-26, and all its records match the
+  current prompt fingerprints. Any prompt or routing change from here on invalidates the run.
+- **The cap is 4** (`max_refines = 4`, five drafts at most), set by the first installment,
+  `batch-20261026T090213Z`. The rest of the 93 are added to that batch, which refuses any change
+  to config or prompts. Step 1 explains why one run at one cap is enough; the first 10 cases
+  already show the fifth draft rescuing nothing.
+- **Don't implement T5 option B first.** Step 2 can tell you, from the frozen records, exactly
+  what option B *would* have done. That makes it a finding instead of a code change you'd have
+  to justify.
+
+**1. Retry budget curve — one run, not four.** The cap only matters at the moment a case would
+exceed it. Up to that point the decisions are identical, so the first *k* rounds of a cap-5 run
+are a valid run at cap *k*, and the frozen run already contains every lower cap. For each cap
+0…N, report the share of cases passed, the share hitting the cap, and the cost per passed case
+(from the per-call usage). This is the headline plot.
+
+**2. Converging, or moving the goalposts?** For every case with two or more reviews, compare
+consecutive verdicts. What share of round *k+1*'s concerns were already raised in round *k*?
+Those mean the editor is repeating itself and the extractor isn't fixing it. What share are
+new? Those mean the editor is moving the goalposts. Also check whether the number of concerns
+shrinks from round to round. This is what explains the 6/10 cap exhaustion in the first live
+batch. You can also simulate T5 option B on the same records (stop when two consecutive
+reviews flag the same sections) at no extra cost.
+
+**3. Editor self-consistency.** Take ~10 fixed drafts from the frozen run and review each one
+5 times at the production settings. How often does the verdict flip between clean and
+flagged? How often are the same sections flagged? If the editor is inconsistent about a fixed
+draft, part of what the loop "fixes" is noise, which bears directly on step 2.
+
+**4. Grader self-consistency.** Grade ~10 cases 5 times each. Report the spread per criterion
+and, more importantly, how often the pass/fail gate flips. Note the range restriction: the
+first live batch scored only 4s and 5s, so variance is measured on what is effectively a
+two-level scale.
+
+**5. The funnel.** The frozen run's funnel table, with every case in exactly one terminal
+state, set beside the prototype's (step 6 of *Deferred — Judge calibration* below).
+
+**6. (Optional) Swap the editor's model.** Re-review the first drafts of a subset with an
+editor from a different vendor. This tests whether the cap exhaustion belongs to the loop or to
+one model.
+
+**Measured cost basis** (first live batch, 10 cases): 94 calls, 554,993 input tokens
+(171,648 cached), 111,520 output. Steps 3–4 reuse saved inputs, so they only add review or
+grading calls, with no extraction.
+
+**Open decisions — yours:**
+- **Cap for the frozen run.** A higher cap gives a longer curve, but every case that exhausts
+  the cap pays for the extra rounds (6 of 10 did in the first batch).
+- **Which gate the funnel reports.** `GradeThresholds` defaults to ≥3; the prototype's
+  reported funnel used the ≥4 hard filter. Pick one before publishing, and say which.
+- **Whether to do step 6.**
+
+### Deferred — Judge calibration (was Phase 2; deferred 2026-10-27)
+
+> **Deferred, not dropped.** Kept intact because it still applies if the doctor review
+> (Phase 3) happens or calibration comes back later. Two parts are out of date. The 2×2 in
+> step 5 was designed to explain a **0% flag rate that no longer exists**: the first live batch
+> after T2/T3 exhausted the cap on 6 of 10 cases. And the empty rubric it would reproduce is
+> gone from the code. Step 6's prototype funnel is still the historical baseline that Phase 2
+> step 5 compares against.
+
 **Calibrate the grader first** — it already emits numeric scores, so it yields a real
 statistic immediately. The editor must be fixed first, or you'd just be measuring the
 empty-rubric bug.
@@ -572,7 +665,7 @@ empty-rubric bug.
 ### Phase 0.5 — Reproducible extraction (deferred to after Phase 2)
 Moved later deliberately: it adds **zero capability** right now (the corpus already exists),
 pulls torch + CUDA (~2–3 GB) into a working environment, and its value is reproducibility
-*documentation* — a Phase 4 concern. Do not let it block calibration.
+*documentation* — a Phase 4 concern. Do not let it block Phase 2.
 
 `notebooks/archive/01_pdf_extraction_mineru.ipynb` is the whole extraction stage, and it is
 six lines: `pip install -U "mineru[core]"`, `mineru -p raw/ -o processed/`, prune, zip,
@@ -659,23 +752,54 @@ Re-run on 5 `_origin.pdf` files and diff against existing output. **If it diverg
 regenerate the corpus** — treat `d:/extracted_data` as the golden reference and document the
 divergence. Regenerating invalidates any calibration done against it.
 
-### Phase 3 — Rubric, taxonomy, self-consistency (week 4, ~8h)
-1. ~~Fix the flag vocabulary (§2.5)~~ — done in T3 (D12). What remains here is the other half:
-   **code the collected free-text explanations into a fault taxonomy** and check whether it beats
-   the five checklist sections. That is now a job with data behind it.
-2. Give the editor a **graded** rubric, not binary flags, so it becomes calibratable too.
-3. Error taxonomy over collected flags; report the distribution.
-4. Self-consistency: sample the judge k=5 at temperature ~0.7. Check whether high-variance
-   cases correlate with your human disagreements — if they do, you have a cheap ambiguity
-   detector, which is a genuinely strong result.
+### Phase 3 — What the loop fixes (week 4, ~8h)
+
+Phase 2 says *how much* the loop does. Phase 3 says *what* it does. (Self-consistency, which
+was item 4 here, moved to Phase 2 steps 3–4.)
+
+1. **Error taxonomy.** ~~Fix the flag vocabulary (§2.5)~~ — done in T3 (D12). What remains is
+   the other half. Every editor verdict carries free-text concerns: read them, group them into
+   types (invented details, diagnosis leaked into the case prompt, missing information, …),
+   check whether those types say more than the five checklist sections do, and report the
+   distribution. **The payoff question: which types disappear after a retry, and which keep
+   coming back?** Join this with Phase 2 step 2. A result like *"the loop reliably fixes leaked
+   diagnoses but never fixes missing information"* is specific, interesting, and needs no
+   labels.
+2. **Doctor review — optional, not confirmed.** This is the one thing that can say whether the
+   loop makes cases *better*, not just different. Nothing else depends on it. Keep the ask
+   small, because doctor time is scarce:
+   - **Recommended design:** 10–15 cases where the loop changed something (two or more
+     drafts). Show the first and final draft side by side, with **left/right randomised** so
+     the doctor can't tell which is which, and ask *"which is better, or are they the same?"*
+     plus an optional one-line reason. About 30–45 minutes, and it tests exactly what the
+     extension claims.
+   - **Alternative:** accept/reject 30 final cases. That's the binary floor of the deferred
+     calibration. It's useful, but it answers a question the project no longer centres on.
+   - Answers go in `eval_labels/` (gitignored). The doctor sees source-derived text, which is
+     fine for review, but anything quoting it is never committed.
+   - If it happens, check whether the cases Phase 2 found high-variance are the ones the
+     doctor found hard. If they line up, self-consistency works as a cheap ambiguity detector.
+3. **Graded editor rubric — optional, later.** Scores instead of binary flags would give a
+   per-round quality trajectory. But it changes the system under study, so it comes **after**
+   Phase 2's frozen baseline, as its own before/after, and is never folded into it.
 
 ### Phase 4 — Write-up (~4h)
-`README.md` with the architecture diagram (`app.get_graph().draw_mermaid_png()` already
-produces it), the funnel table, the calibration table, and the taxonomy chart.
-`DATASHEET.md` for provenance. Short and metric-forward.
+`README.md`, reframed as: **a reimplementation of MedCaseReasoning, plus two extensions (figure
+resolution and the editor → extractor loop), plus what the loop does.**
 
-**If you run out of time:** the image fix and the calibration number are the two items that
-carry the CV claim. Everything after Phase 2 is upside.
+- What's adapted from the paper versus what's added, as a short table.
+- The architecture diagram (`app.get_graph().draw_mermaid_png()` already produces it).
+- Results: the funnel table, the retry budget curve, the convergence finding, the
+  self-consistency numbers, the taxonomy chart, and the doctor review if it happened.
+- **A limitations section that says plainly what isn't measured.** Without the doctor review,
+  the study describes the loop's behaviour, not output quality. Also: one corpus (93 cases, one
+  textbook), one model vendor, and small self-consistency subsets. Saying this first is
+  stronger than being asked.
+- `DATASHEET.md` for provenance and why the data isn't redistributed.
+- Plots in `reports/`, aggregate only.
+
+**If you run out of time:** the figure resolver and the Phase 2 loop study carry the CV claim.
+Phase 3 is upside, and the doctor review is upside on top of that.
 
 ---
 
@@ -684,13 +808,14 @@ carry the CV claim. Everything after Phase 2 is upside.
 Sequenced so each item lands just before you need it. The "be able to" column is the point —
 reading without being able to do the thing doesn't survive an interview.
 
-### Core four — these carry most of the value
+### Core reading — these carry most of the value
 
 | When | Read | Be able to… |
 |---|---|---|
-| **Before Phase 2** | **"Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena"** — Zheng et al., NeurIPS 2023 | Name the three judge biases (position, verbosity, **self-enhancement**) and explain which one your current setup has and how you removed it. Read this one first. |
-| **Before Phase 2** | **"G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment"** — Liu et al., EMNLP 2023 | Explain chain-of-thought + form-filling rubric scoring, and how they correlate judge output with human ratings. Closest published analogue to what you're building. |
-| **Phase 2** | **Inter-rater reliability**: Cohen's κ, quadratic-weighted κ, Krippendorff's α. Any solid primer + `sklearn.metrics.cohen_kappa_score(weights="quadratic")` | Justify *why weighted κ for ordinal scales* and *why raw agreement % is misleading*. You must be able to defend the statistic, not just print it. |
+| **Before Phase 2** | **MedCaseReasoning** — Wu et al., 2025 (arXiv:2505.11733). Read the evaluation section closely. | Say exactly what you reimplemented and what you added, and how *they* validated the base pipeline. If clinicians checked their extraction, you can cite that for the base flow and measure only your extensions against it. |
+| **Before Phase 2** | **"Self-Refine: Iterative Refinement with Self-Feedback"** — Madaan et al., NeurIPS 2023 | Your editor → extractor loop is a variant of this. Explain how yours differs: a separate editor role, a hard cap, and recorded exhaustion. |
+| **Before Phase 2** | **"Large Language Models Cannot Self-Correct Reasoning Yet"** — Huang et al., ICLR 2024 | The counter-argument to your loop, and the reason Phase 2 only claims behaviour, not quality. Be able to say why a loop scored by its own critic proves nothing about quality. |
+| **Before Phase 2** | **"Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena"** — Zheng et al., NeurIPS 2023 | Name the three judge biases (position, verbosity, **self-enhancement**) and say which ones your setup has. Grader, extractor and editor are all one vendor today. |
 | **Phase 1** | **LLaVA-Med** — Li et al., 2023 | Recognise that your figure resolver is the same figure–caption grounding recipe, and cite it in your README. |
 
 ### Supporting, by phase
@@ -712,7 +837,12 @@ reading without being able to do the thing doesn't survive an interview.
 - Packaging + tooling: `uv`, `ruff`, `pytest`, `typer`. Cheap to learn, immediately visible
   in a repo.
 
-**Phase 2 — medical evaluation rubrics**
+**Phase 3 doctor review / deferred calibration**
+- **"G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment"** — Liu et al., EMNLP
+  2023. Rubric scoring, and how judge output is correlated with human ratings.
+- **Inter-rater reliability.** Start with the confusion matrix and plain Cohen's κ, which is
+  all a yes/no review needs. Quadratic-weighted κ only matters for 1–5 scales.
+  `sklearn.metrics.cohen_kappa_score`.
 - **Med-PaLM 2 — "Towards Expert-Level Medical Question Answering with Large Language
   Models"** — Singhal et al., 2023. Its physician-rater rubric is the best available
   template for phrasing your criteria in clinically legible terms.
@@ -736,11 +866,15 @@ reading without being able to do the thing doesn't survive an interview.
 
 They are the actual point of the exercise:
 
-- *Why weighted κ and not accuracy?*
-- *How do you know the judge isn't just agreeing with itself?*
-- *What's your inter-annotator ceiling?*
+- *How do you know more retries made cases better, rather than just making the editor stop complaining?*
+- *When a case hit the cap, was the editor repeating itself or moving the goalposts?*
+- *Does your judge agree with itself?*
+- *What did you add over MedCaseReasoning, and what did each addition actually do?*
 - *What did the pipeline reject, and was it right to?*
-- *Your judge disagreed with you most on "transparency". Why, and what did you do?*
+- *Why is there no calibration number?*
+
+If calibration comes back: *Why weighted κ and not accuracy? What's your inter-annotator
+ceiling?*
 
 ---
 
@@ -760,32 +894,36 @@ They are the actual point of the exercise:
   pinned to `2.5.4` with the pipeline backend.
 - **Phase 1:** unit tests for `"NA"` grading, missing-tag parsing, and `MAX_REFINES=3`
   producing a *recorded* outcome rather than an exception.
-- **Phase 2:** the labelling CLI must be *unable* to show model scores before a human label
-  is committed — enforced in code, and worth a test.
+- **Phase 2:** the frozen run is never regenerated, and every Phase 2/3 number cites its
+  batch id. Sanity-check the "one run, not four" derivation once: the cap-3 slice of the
+  frozen run should look like a direct cap-3 run on the same cases, within sampling noise.
+- **Doctor review / deferred calibration:** whatever collects the answers must be *unable* to
+  reveal which draft is which (or show model scores) before the answer is recorded. Enforce it
+  in code, and give it a test.
 - **End to end:** a full run emits the funnel table, and every input case lands in exactly
   one terminal state. **No silent drops.**
 
 ## 9. Risks
 
-- **MinerU may not reproduce byte-identically** even pinned (model weights, CUDA). Golden
+- **Circularity: the loop is scored by its own editor.** This is the biggest risk to the new
+  direction. Every Phase 2 claim is about behaviour, not quality. The write-up has to hold
+  that line, and the limitations section has to say it first.
+- **Changing things mid-run.** The prompt fixes landed before the first installment (Phase 2
+  step 0). Any prompt or routing change before all 93 are in invalidates the run.
+- **Model drift.** The frozen run is the artifact. Don't regenerate it to "refresh" numbers.
+- **Small n.** 93 cases from one textbook, and ~10 cases per self-consistency check. Report
+  counts next to every percentage.
+- **MinerU may not reproduce byte-identically** even pinned (model weights, CUDA). The golden
   reference stays authoritative; the extraction stage is for documentation, not regeneration.
-- **Single-annotator calibration is weak.** Get a second rater for even half the subset. If
-  genuinely impossible, state the limitation in the README — saying it plainly is stronger
-  than quietly having it.
-- **Rate limits, not cost, dominate wall-clock.** Build resume-from-checkpoint early (you
-  have a crude version already in `if out_file.exists()`).
-- **Scope creep.** Phases 3–4 are optional. Protect Phases 1–2.
-- **The editor may calibrate to κ ≈ 0** (§2.6 — it has never rejected anything). Budget for
-  this being the *result* rather than a blocker: report it, run the 2×2 in Phase 2 step 5 to
-  attribute it between the empty rubric and the quota-forced model, then re-measure. A
-  before/after on a judge you diagnosed and repaired beats a single good number.
-- **Don't over-fit the plan to `gemma-3-27b-it`.** It is in the code because free-tier limits
-  changed mid-project, not because it was chosen. Treat the model as a swappable parameter in
-  `config.py` from day one, and make sure nothing in the prompts or parsing silently depends
-  on its quirks — otherwise you bake a quota decision from last year into the architecture.
-- **The grader's effective range is 3–4, not 1–5** (Phase 2 funnel: zero cases score 5 on all
-  axes). Range restriction depresses κ mechanically. Know this before you compute it, and
-  report the score distribution alongside the agreement statistic.
-- **The corpus-normalisation script is missing** (§1.1). Until `figures.py` replaces it, the
-  pipeline's input is a zip file you cannot rebuild. Treat that zip as irreplaceable until
-  Phase 1 lands — back it up off Drive.
+- **Rate limits, not cost, dominate wall-clock.** ~~Build resume-from-checkpoint early~~ —
+  built: `python -m curator.run --batch` resumes.
+- **Scope creep.** Phase 3 and the doctor review are optional. Protect Phase 2.
+- **The grader's range is restricted.** The prototype scored 3–4; the first live batch scored
+  only 4–5. Either way it's effectively a two-level scale, so report the score distribution
+  next to any variance figure.
+- **One vendor throughout.** Grader, extractor and editor are all OpenAI today (`gpt-4.1`,
+  `gpt-5.5`). Self-enhancement bias can't be ruled out without Phase 2 step 6.
+- **Resolved:** ~~the corpus-normalisation script is missing~~ — `figures.py` replaced it
+  (142/142 resolved). ~~Don't over-fit to `gemma-3-27b-it`~~ — the project moved to OpenAI and
+  the model is a `config.py` setting. ~~The editor may calibrate to κ ≈ 0~~ — it flagged 6 of
+  10 to cap exhaustion in the first live batch, and calibration is deferred.

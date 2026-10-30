@@ -10,15 +10,14 @@ One case, one run. The shape is a straight line with one loop in it::
                                                         \\-> finalize_passed -> END
                                                         \\-> finalize_hit_max_refines -> END
 
-Three properties are worth stating, because each is a bug the notebook had:
+Three properties are worth stating:
 
 - **Every path ends at a ``finalize_*`` node.** There is no edge to ``END`` that skips one, so
   ``terminal_state`` is set on every case that finishes, and a case can never be recorded with
-  no reason for stopping. The notebook's loop simply stopped, and the reason lived in whatever
-  the last print statement said.
+  no reason for stopping.
 - **Routers choose; they never write.** LangGraph forbids a router returning state, and the
   design leans on that: the reason a run ended is carried by *which* terminal node the router
-  picked, not by a field some earlier node guessed at (D24, and ``nodes.finalize``).
+  picked, not by a field some earlier node guessed at.
 - **The loop is bounded.** ``review_route`` compares ``len(verdicts)`` with ``max_refines``
   before sending a case back to ``extract_case``, so a case that never satisfies the editor
   leaves through ``finalize_hit_max_refines`` rather than spending money until something breaks.
@@ -47,13 +46,10 @@ TERMINALS = {reason: f"finalize_{reason.value}" for reason in TerminalState}
 def grade_route(state: CaseState, runtime) -> str:
     """Decide what happens to a graded case: not a case report, too weak to use, or extract.
 
-    **``is_case_report`` is checked first, before any score.** A document the grader says is not
-    a case report at all -- a chapter introduction, say -- is not a low-scoring case report, and
-    the two are counted separately in the funnel (PLAN 2.4, T6). Its four scores are undefined
-    (``Grading``'s docstring): strict mode makes the grader emit numbers anyway, so they must not
-    decide anything. ``GradeThresholds.passes`` also returns ``False`` for a non-case-report, so
-    the order is not what keeps such a document away from the extractor today. Checking first
-    means this router does not depend on that guard staying in ``passes``.
+    ``is_case_report`` is checked before any score. A document that is not a case report gets
+    scores anyway (strict mode forces numbers), so they must not decide anything, and the funnel
+    counts it apart from a low-scoring case report. ``GradeThresholds.passes`` rejects it too,
+    but this router does not rely on that.
 
     Args:
         state (CaseState): Needs ``grading``.
@@ -70,23 +66,11 @@ def grade_route(state: CaseState, runtime) -> str:
 
 
 def review_route(state: CaseState, runtime) -> str:
-    """Decide whether the newest draft is done, needs another pass, or has run out of passes.
+    """Decide whether the newest draft passed, goes round again, or has used up its passes.
 
-    **The cap is the only stop besides approval** (T5, PLAN 2.3). Without it a case the editor
-    never approves would loop until LangGraph's recursion limit stopped it, paying for every
-    pass on the way. Stopping *earlier* -- when a case cannot be fixed, rather than when it runs
-    out of passes -- is an open decision: the first ten cases showed that the obvious signals
-    would also have stopped cases that went on to pass (D29's postscripts, D28's second).
-
-    The pass count is read here rather than stored: ``len(verdicts)`` is how many reviews have
-    happened, so there is no counter to fall behind the list it summarises (D27). Note the
-    arithmetic, because this is where the old ``refine_count`` hid an off-by-one: the first
-    extract is not a *refine*, so the refines already done is one fewer than the verdicts in
-    hand, and ``max_refines = 3`` therefore permits four extract passes -- what
-    ``.env.example`` has always claimed it means.
-
-    "Satisfactory" is computed here rather than stored: an empty ``concerns`` list is the only
-    spelling of a clean draft (``EditorVerdict``), so there is nothing to disagree with.
+    No concerns means passed. Otherwise the case goes back to ``extract_case`` until
+    ``max_refines`` refines are done. The first draft is not a refine, so ``max_refines=3``
+    allows four drafts -- an off-by-one this line once had.
 
     Args:
         state (CaseState): Needs ``verdicts``.

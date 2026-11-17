@@ -173,7 +173,7 @@ def test_calls_at_cap() -> None:
     record = case([2, 1, 3, 0])
 
     assert [len(calls_at_cap(record, cap)) for cap in range(MAX_REFINES + 1)] == [3, 5, 7, 9, 9]
-    
+
     with pytest.raises(ValueError):
         calls_at_cap(record, MAX_REFINES + 1)
     with pytest.raises(ValueError):
